@@ -23,22 +23,6 @@ var (
 	namespace      = "kibana"
 )
 
-var (
-	//dumbCounter = prometheus.NewCounter(
-	//	prometheus.CounterOpts{
-	//		Name:      "dumb_kibana_count",
-	//		Help:      "Dumb kibana counter",
-	//		Namespace: namespace,
-	//	})
-
-	stateGauge = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "overall_state",
-			Help:      "Kibana Overall Status",
-			Namespace: namespace,
-		})
-)
-
 type KibanaCollector struct {
 	url        string
 	authHeader string
@@ -49,11 +33,21 @@ type Exporter struct {
 	lock      sync.RWMutex
 	collector *KibanaCollector
 
-	//dumb  prometheus.Counter
-	state prometheus.Gauge
+	status                prometheus.Gauge
+	concurrentConnections prometheus.Gauge
+	uptime                prometheus.Gauge
+	heapTotal             prometheus.Gauge
+	heapUsed              prometheus.Gauge
+	load1m                prometheus.Gauge
+	load5m                prometheus.Gauge
+	load15m               prometheus.Gauge
+	respTimeAvg           prometheus.Gauge
+	respTimeMax           prometheus.Gauge
+	reqDisconnects        prometheus.Gauge
+	reqTotal              prometheus.Gauge
 }
 
-type KibanaStatus struct {
+type KibanaMetrics struct {
 	Status struct {
 		Overall struct {
 			State string `json:"state"`
@@ -72,8 +66,8 @@ type KibanaStatus struct {
 		} `json:"process"`
 		Os struct {
 			Load struct {
-				Load1M  float64 `json:"1m"`
-				Load5M  float64 `json:"5m"`
+				Load1m  float64 `json:"1m"`
+				Load5m  float64 `json:"5m"`
 				Load15m float64 `json:"15m"`
 			} `json:"load"`
 		} `json:"os"`
@@ -88,8 +82,12 @@ type KibanaStatus struct {
 	} `json:"metrics"`
 }
 
-func (c *KibanaCollector) scrape() (error, *KibanaStatus) {
+func (c *KibanaCollector) scrape() (error, *KibanaMetrics) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/status?extended", c.url), nil)
+	if err != nil {
+		return errors.New(fmt.Sprintf("could not initialize a request to scrape metrics: %s", err)), nil
+	}
+
 	if c.authHeader != "" {
 		req.Header.Add("Authorization", c.authHeader)
 	}
@@ -113,13 +111,13 @@ func (c *KibanaCollector) scrape() (error, *KibanaStatus) {
 		return errors.New(fmt.Sprintf("error while reading response from Kibana status: %s", err)), nil
 	}
 
-	status := &KibanaStatus{}
-	err = json.Unmarshal(respContent, &status)
+	metrics := &KibanaMetrics{}
+	err = json.Unmarshal(respContent, &metrics)
 	if err != nil {
 		return errors.New(fmt.Sprintf("error while unmarshalling Kibana status: %s\nProblematic content:\n%s", err, respContent)), nil
 	}
 
-	return nil, status
+	return nil, metrics
 }
 
 func NewExporter(kUrl, kUname, kPwd, namespace string) *Exporter {
@@ -136,41 +134,148 @@ func NewExporter(kUrl, kUname, kPwd, namespace string) *Exporter {
 	exporter := &Exporter{
 		collector: collector,
 
-		state: prometheus.NewGauge(
+		status: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name:      "overall_state",
+				Name:      "status",
 				Help:      "Kibana overall status",
 				Namespace: namespace,
+			}),
+		concurrentConnections: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "concurrent_connections",
+				Namespace: namespace,
+				Help:      "Kibana Concurrent Connections",
+			}),
+		uptime: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "millis_uptime",
+				Namespace: namespace,
+				Help:      "Kibana uptime in milliseconds",
+			}),
+		heapTotal: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "heap_max_in_bytes",
+				Namespace: namespace,
+				Help:      "Kibana Heap maximum in bytes",
+			}),
+		heapUsed: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "heap_used_in_bytes",
+				Namespace: namespace,
+				Help:      "Kibana Heap usage in bytes",
+			}),
+		load1m: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "os_load1",
+				Namespace: namespace,
+				Help:      "Kibana load average 1m",
+			}),
+		load5m: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "os_load5",
+				Namespace: namespace,
+				Help:      "Kibana load average 5m",
+			}),
+		load15m: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "os_load15",
+				Namespace: namespace,
+				Help:      "Kibana load average 15m",
+			}),
+		respTimeAvg: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "response_average",
+				Namespace: namespace,
+				Help:      "Kibana average response time in milliseconds",
+			}),
+		respTimeMax: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "response_max",
+				Namespace: namespace,
+				Help:      "Kibana maximum response time in milliseconds",
+			}),
+		reqDisconnects: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "requests_disconnects",
+				Namespace: namespace,
+				Help:      "Kibana request disconnections count",
+			}),
+		reqTotal: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "requests_total",
+				Namespace: namespace,
+				Help:      "Kibana total request count",
 			}),
 	}
 
 	return exporter
+}
 
+func (e *Exporter) parseMetrics(m *KibanaMetrics) error {
+	log.Printf("State: %s", m.Status.Overall.State)
+	statusVal := 0.0
+	if m.Status.Overall.State == "green" {
+		statusVal = 1.0
+	}
+
+	e.status.Set(statusVal)
+
+	e.concurrentConnections.Set(float64(m.Metrics.ConcurrentConnections))
+	e.uptime.Set(float64(m.Metrics.Process.UptimeInMillis))
+	e.heapTotal.Set(float64(m.Metrics.Process.Memory.Heap.TotalInBytes))
+	e.heapUsed.Set(float64(m.Metrics.Process.Memory.Heap.UsedInBytes))
+	e.load1m.Set(m.Metrics.Os.Load.Load1m)
+	e.load5m.Set(m.Metrics.Os.Load.Load5m)
+	e.load15m.Set(m.Metrics.Os.Load.Load15m)
+	e.respTimeAvg.Set(m.Metrics.ResponseTimes.AvgInMillis)
+	e.respTimeMax.Set(m.Metrics.ResponseTimes.MaxInMillis)
+	e.reqDisconnects.Set(float64(m.Metrics.Requests.Disconnects))
+	e.reqTotal.Set(float64(m.Metrics.Requests.Total))
+
+	return nil
+}
+
+func (e *Exporter) send(ch chan<- prometheus.Metric) error {
+	ch <- e.status
+	ch <- e.concurrentConnections
+	ch <- e.uptime
+	ch <- e.heapTotal
+	ch <- e.heapUsed
+	ch <- e.load1m
+	ch <- e.load5m
+	ch <- e.load15m
+	ch <- e.respTimeAvg
+	ch <- e.respTimeMax
+	ch <- e.reqDisconnects
+	ch <- e.reqTotal
+
+	return nil
 }
 
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
-	ch <- e.state.Desc()
+	ch <- e.status.Desc()
 }
 
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	err, status := e.collector.scrape()
+	err, metrics := e.collector.scrape()
 	if err != nil {
 		log.Printf("error while scraping metrics from Kibana: %s", err)
 		return
 	}
 
-	log.Printf("State: %s", status.Status.Overall.State)
-	stateVal := 0.0
-	if status.Status.Overall.State == "green" {
-		stateVal = 1
+	err = e.parseMetrics(metrics)
+	if err != nil {
+		log.Printf("error while parsing metrics from Kibana: %s", err)
+		return
 	}
 
-	e.state.Set(stateVal)
-
-	ch <- e.state
+	err = e.send(ch)
+	if err != nil {
+		log.Printf("error while responding to Prometheus with metrics: %s", err)
+	}
 }
 
 func main() {

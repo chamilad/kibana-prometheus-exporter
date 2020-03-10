@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,7 +14,6 @@ import (
 	"sync"
 )
 
-// args
 var (
 	addr           = flag.String("web.listen-address", ":8080", "The address to listen on for HTTP requests.")
 	metricsPath    = flag.String("web.telemetry-path", "/metrics", "The address to listen on for HTTP requests.")
@@ -24,12 +24,12 @@ var (
 )
 
 var (
-	dumbCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name:      "dumb_kibana_count",
-			Help:      "Dumb kibana counter",
-			Namespace: namespace,
-		})
+	//dumbCounter = prometheus.NewCounter(
+	//	prometheus.CounterOpts{
+	//		Name:      "dumb_kibana_count",
+	//		Help:      "Dumb kibana counter",
+	//		Namespace: namespace,
+	//	})
 
 	stateGauge = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -39,9 +39,17 @@ var (
 		})
 )
 
+type KibanaCollector struct {
+	url        string
+	authHeader string
+	client     *http.Client
+}
+
 type Exporter struct {
-	lock  sync.RWMutex
-	dumb  prometheus.Counter
+	lock      sync.RWMutex
+	collector *KibanaCollector
+
+	//dumb  prometheus.Counter
 	state prometheus.Gauge
 }
 
@@ -80,44 +88,78 @@ type KibanaStatus struct {
 	} `json:"metrics"`
 }
 
+func (c *KibanaCollector) scrape() (error, *KibanaStatus) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/status?extended", c.url), nil)
+	if c.authHeader != "" {
+		req.Header.Add("Authorization", c.authHeader)
+	}
+
+	req.Header.Add("Accept", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return errors.New(fmt.Sprintf("error while reading Kibana status: %s", err)), nil
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.New(fmt.Sprintf("invalid response from Kibana status: %s", resp.Status)), nil
+
+	}
+
+	respContent, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return errors.New(fmt.Sprintf("error while reading response from Kibana status: %s", err)), nil
+	}
+
+	status := &KibanaStatus{}
+	err = json.Unmarshal(respContent, &status)
+	if err != nil {
+		return errors.New(fmt.Sprintf("error while unmarshalling Kibana status: %s\nProblematic content:\n%s", err, respContent)), nil
+	}
+
+	return nil, status
+}
+
+func NewExporter(kUrl, kUname, kPwd, namespace string) *Exporter {
+	collector := &KibanaCollector{}
+	collector.url = kUrl
+	collector.client = &http.Client{}
+
+	if kUname != "" && kPwd != "" {
+		creds := fmt.Sprintf("%s:%s", *kibanaUsername, *kibanaPassword)
+		encCreds := base64.StdEncoding.EncodeToString([]byte(creds))
+		collector.authHeader = fmt.Sprintf("Basic %s", encCreds)
+	}
+
+	exporter := &Exporter{
+		collector: collector,
+
+		state: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "overall_state",
+				Help:      "Kibana overall status",
+				Namespace: namespace,
+			}),
+	}
+
+	return exporter
+
+}
+
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
-	ch <- e.dumb.Desc()
+	ch <- e.state.Desc()
 }
 
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	creds := fmt.Sprintf("%s:%s", *kibanaUsername, *kibanaPassword)
-	encCreds := base64.StdEncoding.EncodeToString([]byte(creds))
-
-	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/status?extended", *kibanaUri), nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encCreds))
-	req.Header.Add("Accept", "application/json")
-
-	resp, err := client.Do(req)
+	err, status := e.collector.scrape()
 	if err != nil {
-		log.Printf("error while reading Kibana status: %s", err)
+		log.Printf("error while scraping metrics from Kibana: %s", err)
 		return
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("invalid response from Kibana status: %s", resp.Status)
-		return
-	}
-
-	respContent, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("error while reading response from Kibana status: %s", err)
-	}
-
-	status := &KibanaStatus{}
-	err = json.Unmarshal(respContent, &status)
-	if err != nil {
-		log.Printf("error while unmarshalling Kibana status: %s\nProblematic content:\n%s", err, respContent)
 	}
 
 	log.Printf("State: %s", status.Status.Overall.State)
@@ -126,25 +168,16 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		stateVal = 1
 	}
 
-	e.dumb.Inc()
 	e.state.Set(stateVal)
 
-	ch <- e.dumb
 	ch <- e.state
 }
 
-// /metrics endpoint
 func main() {
 	flag.Parse()
 
-	//prometheus.MustRegister(dumbCounter)
-	exporter := &Exporter{
-		dumb:  dumbCounter,
-		state: stateGauge,
-	}
-
+	exporter := NewExporter(*kibanaUri, *kibanaUsername, *kibanaPassword, namespace)
 	prometheus.MustRegister(exporter)
-	//prometheus.MustRegister(prometheus.NewBuildInfoCollector())
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
@@ -160,5 +193,3 @@ func main() {
 	log.Printf("starting metrics server at %s,", *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
-
-// fetch metrics

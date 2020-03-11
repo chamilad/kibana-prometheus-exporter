@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	addr           = flag.String("web.listen-address", ":8080", "The address to listen on for HTTP requests.")
+	addr           = flag.String("web.listen-address", ":9684", "The address to listen on for HTTP requests.")
 	metricsPath    = flag.String("web.telemetry-path", "/metrics", "The address to listen on for HTTP requests.")
 	kibanaUri      = flag.String("kibana.uri", "", "The Kibana API to fetch metrics from")
 	kibanaUsername = flag.String("kibana.username", "", "The username to use for Kibana API")

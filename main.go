@@ -11,24 +11,38 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 )
 
 var (
 	addr           = flag.String("web.listen-address", ":8080", "The address to listen on for HTTP requests.")
 	metricsPath    = flag.String("web.telemetry-path", "/metrics", "The address to listen on for HTTP requests.")
-	kibanaUri      = flag.String("kibana.uri", "http://kibana:5601", "The Kibana API to fetch metrics from")
-	kibanaUsername = flag.String("kibana.username", "elastic", "The username to use for Kibana API")
+	kibanaUri      = flag.String("kibana.uri", "", "The Kibana API to fetch metrics from")
+	kibanaUsername = flag.String("kibana.username", "", "The username to use for Kibana API")
 	kibanaPassword = flag.String("kibana.password", "", "The password to use for Kibana API")
 	namespace      = "kibana"
 )
 
+// A type that collects the Kibana information together to be used by
+// the exporter to scrape metrics.
 type KibanaCollector struct {
-	url        string
+	// url is the base URL of the Kibana instance or the service
+	url string
+
+	// authHeader is the string that should be used as the value
+	// for the "Authorization" header. If this is empty, it is
+	// assumed that no authorization is needed.
 	authHeader string
-	client     *http.Client
+
+	// client is the http.Client that will be used to make
+	// requests to collect the Kibana metrics
+	client *http.Client
 }
 
+// A type that implements the prometheus.Collector interface. This will
+// be used to register the metrics with Prometheus.
 type Exporter struct {
 	lock      sync.RWMutex
 	collector *KibanaCollector
@@ -47,6 +61,7 @@ type Exporter struct {
 	reqTotal              prometheus.Gauge
 }
 
+// A type that is used to unmarshal the metrics response from Kibana.
 type KibanaMetrics struct {
 	Status struct {
 		Overall struct {
@@ -56,11 +71,11 @@ type KibanaMetrics struct {
 	Metrics struct {
 		ConcurrentConnections int `json:"concurrent_connections"`
 		Process               struct {
-			UptimeInMillis int `json:"uptime_in_millis"`
+			UptimeInMillis int64 `json:"uptime_in_millis"`
 			Memory         struct {
 				Heap struct {
-					TotalInBytes int `json:"total_in_bytes"`
-					UsedInBytes  int `json:"used_in_bytes"`
+					TotalInBytes int64 `json:"total_in_bytes"`
+					UsedInBytes  int64 `json:"used_in_bytes"`
 				} `json:"heap"`
 			} `json:"memory"`
 		} `json:"process"`
@@ -82,6 +97,9 @@ type KibanaMetrics struct {
 	} `json:"metrics"`
 }
 
+// scrape will connect to the Kibana instance, using the details
+// provided by the KibanaCollector struct, and return the metrics as a
+// KibanaMetrics representation.
 func (c *KibanaCollector) scrape() (error, *KibanaMetrics) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/status?extended", c.url), nil)
 	if err != nil {
@@ -120,15 +138,21 @@ func (c *KibanaCollector) scrape() (error, *KibanaMetrics) {
 	return nil, metrics
 }
 
+// NewExporter will create a Exporter struct and initialize the metrics
+// that will be scraped by Prometheus. It will use the provided Kibana
+// details to populate a KibanaCollector struct.
 func NewExporter(kUrl, kUname, kPwd, namespace string) *Exporter {
 	collector := &KibanaCollector{}
 	collector.url = kUrl
 	collector.client = &http.Client{}
 
 	if kUname != "" && kPwd != "" {
+		log.Printf("using authenticated requests with Kibana")
 		creds := fmt.Sprintf("%s:%s", *kibanaUsername, *kibanaPassword)
 		encCreds := base64.StdEncoding.EncodeToString([]byte(creds))
 		collector.authHeader = fmt.Sprintf("Basic %s", encCreds)
+	} else {
+		log.Print("Kibana username or password is not provided, assuming unauthenticated communication")
 	}
 
 	exporter := &Exporter{
@@ -166,19 +190,19 @@ func NewExporter(kUrl, kUname, kPwd, namespace string) *Exporter {
 			}),
 		load1m: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name:      "os_load1",
+				Name:      "os_load_1m",
 				Namespace: namespace,
 				Help:      "Kibana load average 1m",
 			}),
 		load5m: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name:      "os_load5",
+				Name:      "os_load_5m",
 				Namespace: namespace,
 				Help:      "Kibana load average 5m",
 			}),
 		load15m: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name:      "os_load15",
+				Name:      "os_load_15m",
 				Namespace: namespace,
 				Help:      "Kibana load average 15m",
 			}),
@@ -211,10 +235,12 @@ func NewExporter(kUrl, kUname, kPwd, namespace string) *Exporter {
 	return exporter
 }
 
+// parseMetrics will set the metrics values using the KibanaMetrics
+// struct, converting values to float64 where needed.
 func (e *Exporter) parseMetrics(m *KibanaMetrics) error {
-	log.Printf("State: %s", m.Status.Overall.State)
+	// any value other than "green" is assumed to be less than 1
 	statusVal := 0.0
-	if m.Status.Overall.State == "green" {
+	if strings.ToLower(m.Status.Overall.State) == "green" {
 		statusVal = 1.0
 	}
 
@@ -252,10 +278,23 @@ func (e *Exporter) send(ch chan<- prometheus.Metric) error {
 	return nil
 }
 
+// Describe is the Exporter implementing prometheus.Collector
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.status.Desc()
+	ch <- e.concurrentConnections.Desc()
+	ch <- e.uptime.Desc()
+	ch <- e.heapTotal.Desc()
+	ch <- e.heapUsed.Desc()
+	ch <- e.load1m.Desc()
+	ch <- e.load5m.Desc()
+	ch <- e.load15m.Desc()
+	ch <- e.respTimeAvg.Desc()
+	ch <- e.respTimeMax.Desc()
+	ch <- e.reqDisconnects.Desc()
+	ch <- e.reqTotal.Desc()
 }
 
+// Collect is the Exporter implementing prometheus.Collector
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -281,6 +320,13 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 func main() {
 	flag.Parse()
 
+	if *kibanaUri == "" {
+		log.Fatal("required flag -kibana.uri not provided, aborting")
+		os.Exit(1)
+	}
+
+	log.Printf("using Kibana URL: %s", *kibanaUri)
+
 	exporter := NewExporter(*kibanaUri, *kibanaUsername, *kibanaPassword, namespace)
 	prometheus.MustRegister(exporter)
 
@@ -295,6 +341,7 @@ func main() {
 	})
 
 	http.Handle(*metricsPath, promhttp.Handler())
-	log.Printf("starting metrics server at %s,", *addr)
+
+	log.Printf("starting metrics server at %s", *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }

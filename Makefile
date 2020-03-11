@@ -19,6 +19,9 @@ release: clean
 	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -a -o ${TARGET}/release/${BINARY}-${VERSION}-linux-amd64
 	chmod -R +x ${TARGET}/release
 
+docker: clean release
+	docker build --build-arg OS=linux --build-arg ARCH=amd64 --build-arg VERSION=${VERSION} -t chamilad/kibana_prometheus_exporter:${VERSION} .
+
 clean:
 	go clean
 	rm -rf ${TARGET}

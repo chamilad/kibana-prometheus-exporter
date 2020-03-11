@@ -47,6 +47,7 @@ type Exporter struct {
 	lock      sync.RWMutex
 	collector *KibanaCollector
 
+	// metrics
 	status                prometheus.Gauge
 	concurrentConnections prometheus.Gauge
 	uptime                prometheus.Gauge

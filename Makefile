@@ -1,5 +1,6 @@
 # Makefile
 BINARY="kibana_exporter"
+IMG="kibana-prometheus-exporter"
 TARGET="build"
 VERSION="v7.5.x.1-latest"
 
@@ -22,8 +23,10 @@ release: clean
 	chmod -R +x ${TARGET}/release
 
 docker: clean release
-	docker build --build-arg OS=linux --build-arg ARCH=amd64 --build-arg VERSION=${VERSION} -t chamilad/kibana_prometheus_exporter:${VERSION} .
+	docker build --build-arg OS=linux --build-arg ARCH=amd64 --build-arg VERSION=${VERSION} -t chamilad/${IMG}:${VERSION} .
 
+docker-release: clean release docker
+	docker push chamilad/${IMG}:${VERSION}
 clean:
 	go clean
 	rm -rf ${TARGET}

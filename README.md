@@ -4,6 +4,8 @@ A standalone Prometheus exporter for Kibana metrics inspired by the [Kibana Prom
 
 This makes use of the `/api/status` endpoint to gather and convert metrics to the Prometheus OpenMetrics format.
 
+![](metrics-output.png)
+
 ## Usage
 
 > **NOTE**: Currently only tested against Kibana 7.5 versions. 
@@ -102,10 +104,11 @@ The metrics exposed by this Exporter are the following.
 | `kibana_requests_total` | Kibana total request count | Gauge |
 
 ## TODO
-1. Test edge cases more
-2. Add more metrics related to the scrape job itself
-3. Add a Grafana dashboards with (Prometheus) alerts 
-4. Add mTLS to the metrics server
+1. Test other versions and edge cases more
+2. Come up with a way to keep up with Kibana API changes
+3. Add more metrics related to the scrape job itself
+4. Add a Grafana dashboards with (Prometheus) alerts 
+5. Add mTLS to the metrics server
 
 ## Contributing
 More metrics, useful tweaks, samples, bug fixes, and any other form of contributions are welcome. Please fork, modify, and open a PR. Please open a GitHub issue for observed bugs or feature requests. I will try to attend to them when possible.

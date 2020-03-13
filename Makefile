@@ -11,6 +11,8 @@ LDFLAGS=-ldflags "-extldflags '-static' -s -w"
 
 $(BINARY): clean
 	mkdir -p ${TARGET}
+	go fmt ./...
+	go test ./...
 	go build -o ${TARGET}/${BINARY}
 	chmod +x ${TARGET}/${BINARY}
 

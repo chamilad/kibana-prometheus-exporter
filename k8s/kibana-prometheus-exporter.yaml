@@ -18,7 +18,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: kibana-prometheus-exporter
-        image: chamilad/kibana-prometheus-exporter:v7.5.x.1
+        image: chamilad/kibana-prometheus-exporter:v7.5.x.2-latest
         args: [
           "-kibana.uri", "http://kibana:5601",
         ]

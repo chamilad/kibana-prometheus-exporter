@@ -31,7 +31,7 @@ kibana-exporter -kibana.uri http://localhost:5601 -web.telemetry-path "/scrape"
 The Docker Image `chamilad/kibana-prometheus-exporter` can be used directly to run the exporter in a Dockerized environment. The Container filesystem only contains the statically linked binary, so that it can be run independently. 
 
 ```bash
-docker run -p 9684:9684 -it chamilad/kibana-prometheus-exporter:v7.5.x.-latest -kibana.username elastic -kibana.password password -kibana.uri https://elasticcloud.kibana.aws.found.io
+docker run -p 9684:9684 -it chamilad/kibana-prometheus-exporter:v7.5.x.1 -kibana.username elastic -kibana.password password -kibana.uri https://elasticcloud.kibana.aws.found.io
 ```
 
 Refer to the [Makefile](Makefile) and the [Dockerfile](Dockerfile) for more details.

@@ -17,6 +17,7 @@ var (
 	kibanaUri      = flag.String("kibana.uri", "", "The Kibana API to fetch metrics from")
 	kibanaUsername = flag.String("kibana.username", "", "The username to use for Kibana API")
 	kibanaPassword = flag.String("kibana.password", "", "The password to use for Kibana API")
+	kibanaSkipTls  = flag.Bool("kibana.skip-tls", false, "Skip TLS verification for TLS secured Kibana URLs")
 	namespace      = "kibana"
 )
 
@@ -33,7 +34,7 @@ func main() {
 
 	log.Printf("using Kibana URL: %s", *kibanaUri)
 
-	err, exporter := exporter.NewExporter(*kibanaUri, *kibanaUsername, *kibanaPassword, namespace)
+	err, exporter := exporter.NewExporter(*kibanaUri, *kibanaUsername, *kibanaPassword, namespace, *kibanaSkipTls)
 	if err != nil {
 		log.Fatal("error while initializing exporter: ", err)
 		os.Exit(1)

@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -35,7 +36,7 @@ type Exporter struct {
 // NewExporter will create a Exporter struct and initialize the metrics
 // that will be scraped by Prometheus. It will use the provided Kibana
 // details to populate a KibanaCollector struct.
-func NewExporter(kUrl, kUname, kPwd, namespace string) (error, *Exporter) {
+func NewExporter(kUrl, kUname, kPwd, namespace string, skipTls bool) (error, *Exporter) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return errors.New("namespace cannot be empty"), nil
@@ -43,7 +44,29 @@ func NewExporter(kUrl, kUname, kPwd, namespace string) (error, *Exporter) {
 
 	collector := &KibanaCollector{}
 	collector.url = kUrl
-	collector.client = &http.Client{}
+
+	if strings.HasPrefix(kUrl, "https://") {
+		if skipTls {
+			log.Printf("skipping TLS verification for Kibana URL %s", kUrl)
+		}
+
+		tConf := &tls.Config{
+			InsecureSkipVerify: skipTls,
+		}
+
+		tr := &http.Transport{
+			TLSClientConfig: tConf,
+		}
+
+		collector.client = &http.Client{
+			Transport: tr,
+		}
+	} else {
+		collector.client = &http.Client{}
+		if skipTls {
+			log.Printf("kibana.skip-tls is enabled for an http URL, ignoring: %s", kUrl)
+		}
+	}
 
 	if kUname != "" && kPwd != "" {
 		log.Printf("using authenticated requests with Kibana")

@@ -19,12 +19,17 @@ By default, the Exporter exposes the `/metrics` endpoint at port `9684`. If need
 
 ```bash
 # expose the /metrics endpoint at port 8080
-kibana-exporter -kibana.uri http://localhost:5601 -web.listen-address 8080 
+kibana-exporter -kibana.uri http://localhost:5601 -web.listen-address :8080 
 ```
 
 ```bash
 # expose metrics using /scrape endpint
 kibana-exporter -kibana.uri http://localhost:5601 -web.telemetry-path "/scrape"
+```
+
+```bash
+# skip TLS verification for self-signed Kibana certificates
+kibana-exporter -kibana.uri https://kibana.local:5601 -kibana.skip-tls true
 ```
 
 ### Docker 
@@ -109,6 +114,7 @@ The metrics exposed by this Exporter are the following.
 3. Add more metrics related to the scrape job itself
 4. Add a Grafana dashboards with (Prometheus) alerts 
 5. Add mTLS to the metrics server
+6. Add an initial connection test and fail early
 
 ## Contributing
 More metrics, useful tweaks, samples, bug fixes, and any other form of contributions are welcome. Please fork, modify, and open a PR. Please open a GitHub issue for observed bugs or feature requests. I will try to attend to them when possible.

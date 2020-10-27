@@ -1,0 +1,5 @@
+# config to generate a self signed cert for elasticsearch
+instances:
+  - name: "kibana"
+    dns: [ "kibana.local" ]
+

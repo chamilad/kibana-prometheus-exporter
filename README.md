@@ -1,5 +1,14 @@
 # Prometheus Exporter for Kibana (7.5.*)
 
+1. [Usage](#usage)
+    1. [Docker](#docker)
+    2. [Kubernetes](#kubernetes)
+        1. [Helm Chart](#helm-chart)
+2. [Metrics](#metrics)
+3. [TODO](#todo)
+4. [Contributing](#contributing)
+5. [License](#license)
+
 A standalone Prometheus exporter for Kibana metrics inspired by the [Kibana Prometheus Exporter Plugin](https://github.com/pjhampton/kibana-prometheus-exporter/). 
 
 This makes use of the `/api/status` endpoint to gather and convert metrics to the Prometheus OpenMetrics format.
@@ -89,6 +98,15 @@ With these artifacts deployed, the following Prometheus scrape configuration can
 1. The `scrape_interval` for the job is kept to once per minute. This is to reduce the load on the ElasticSearch cluster, by frequent API calls.
 2. The port to connect is detected through a K8s Service annotation, `prometheus.io/port`. 
 3. The metrics will end up with the label `job: kibana`
+
+#### Helm Chart
+@pavdmyt has [developed a Helm chart](https://github.com/chamilad/kibana-prometheus-exporter/issues/4) that can be successfully used to deploy the Kibana Exporter on a K8s cluster available at [AnchorFree](https://github.com/AnchorFree/helm-charts/tree/master/stable/kibana-exporter). To use the chart, simply add the Helm repository and install the chart as follows.
+
+```bash
+$ helm repo add afcharts https://anchorfree.github.io/helm-charts
+$ helm repo update
+$ helm install <release-name> afcharts/kibana-exporter
+```
 
 ## Metrics
 The metrics exposed by this Exporter are the following.

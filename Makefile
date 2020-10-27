@@ -2,7 +2,7 @@
 BINARY="kibana_exporter"
 IMG="kibana-prometheus-exporter"
 TARGET="build"
-VERSION="v7.5.x.2"
+VERSION="v7.x.1-latest"
 
 # explicitly go mod
 export GO111MODULE=on

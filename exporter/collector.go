@@ -64,7 +64,7 @@ type KibanaMetrics struct {
 // provided by the KibanaCollector struct, and return the metrics as a
 // KibanaMetrics representation.
 func (c *KibanaCollector) scrape() (error, *KibanaMetrics) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/status?extended", c.url), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/status", c.url), nil)
 	if err != nil {
 		return errors.New(fmt.Sprintf("could not initialize a request to scrape metrics: %s", err)), nil
 	}

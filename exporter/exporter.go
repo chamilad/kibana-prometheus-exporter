@@ -3,13 +3,15 @@ package exporter
 import (
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // A type that implements the prometheus.Collector interface. This will
@@ -17,6 +19,7 @@ import (
 type Exporter struct {
 	lock      sync.RWMutex
 	collector *KibanaCollector
+	debug     bool
 
 	// metrics
 	status                prometheus.Gauge
@@ -36,7 +39,7 @@ type Exporter struct {
 // NewExporter will create a Exporter struct and initialize the metrics
 // that will be scraped by Prometheus. It will use the provided Kibana
 // details to populate a KibanaCollector struct.
-func NewExporter(kUrl, kUname, kPwd, namespace string, skipTls bool) (error, *Exporter) {
+func NewExporter(kUrl, kUname, kPwd, namespace string, skipTls bool, debug bool) (error, *Exporter) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return errors.New("namespace cannot be empty"), nil
@@ -79,6 +82,7 @@ func NewExporter(kUrl, kUname, kPwd, namespace string, skipTls bool) (error, *Ex
 
 	exporter := &Exporter{
 		collector: collector,
+		debug:     debug,
 
 		status: prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -225,6 +229,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	if err != nil {
 		log.Printf("error while scraping metrics from Kibana: %s", err)
 		return
+	}
+
+	if e.debug {
+		op, _ := json.Marshal(metrics)
+		log.Printf("returned metrics: %s", string(op))
 	}
 
 	err = e.parseMetrics(metrics)

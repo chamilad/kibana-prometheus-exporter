@@ -5,7 +5,7 @@ import (
 )
 
 func TestNewExporterUnauthenticated(t *testing.T) {
-	err, exporter := NewExporter("http://localhost:5601", "", "", "kibana_test", false)
+	err, exporter := NewExporter("http://localhost:5601", "", "", "kibana_test", false, true)
 	if err != nil {
 		t.Errorf("NewExporter failed with valid input")
 	}
@@ -16,7 +16,7 @@ func TestNewExporterUnauthenticated(t *testing.T) {
 }
 
 func TestNewExporterUnauthenticatedWithOnlyUsername(t *testing.T) {
-	err, exporter := NewExporter("http://localhjost:5601", "someusername", "", "kibana_test", false)
+	err, exporter := NewExporter("http://localhjost:5601", "someusername", "", "kibana_test", false, true)
 	if err != nil {
 		t.Errorf("NewExporter failed with valid input")
 	}
@@ -27,7 +27,7 @@ func TestNewExporterUnauthenticatedWithOnlyUsername(t *testing.T) {
 }
 
 func TestNewExporterUnauthenticatedWithOnlyPassword(t *testing.T) {
-	err, exporter := NewExporter("http://localhjost:5601", "", "somepassword", "kibana_test", false)
+	err, exporter := NewExporter("http://localhjost:5601", "", "somepassword", "kibana_test", false, true)
 	if err != nil {
 		t.Errorf("NewExporter failed with valid input")
 	}
@@ -38,7 +38,7 @@ func TestNewExporterUnauthenticatedWithOnlyPassword(t *testing.T) {
 }
 
 func TestNewExporterWithoutNamespace(t *testing.T) {
-	err, _ := NewExporter("http://localhost:5601", "", "", "", false)
+	err, _ := NewExporter("http://localhost:5601", "", "", "", false, true)
 	if err == nil {
 		t.Errorf("expected error when invalid namespace was provided")
 	}

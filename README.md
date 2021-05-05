@@ -41,6 +41,25 @@ kibana-exporter -kibana.uri http://localhost:5601 -web.telemetry-path "/scrape"
 kibana-exporter -kibana.uri https://kibana.local:5601 -kibana.skip-tls true
 ```
 
+### Flags
+```
+  -debug
+        Output verbose details during metrics collection, use for development only
+  -kibana.password string
+        The password to use for Kibana API
+  -kibana.skip-tls
+        Skip TLS verification for TLS secured Kibana URLs
+  -kibana.uri string
+        The Kibana API to fetch metrics from
+  -kibana.username string
+        The username to use for Kibana API
+  -web.listen-address string
+        The address to listen on for HTTP requests. (default ":9684")
+  -web.telemetry-path string
+        The address to listen on for HTTP requests. (default "/metrics")
+
+```
+
 ### Docker 
 The Docker Image `chamilad/kibana-prometheus-exporter` can be used directly to run the exporter in a Dockerized environment. The Container filesystem only contains the statically linked binary, so that it can be run independently. 
 

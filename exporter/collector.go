@@ -34,7 +34,7 @@ type KibanaMetrics struct {
 	Metrics struct {
 		ConcurrentConnections int `json:"concurrent_connections"`
 		Process               struct {
-			UptimeInMillis int64 `json:"uptime_in_millis"`
+			UptimeInMillis float64 `json:"uptime_in_millis"`
 			Memory         struct {
 				Heap struct {
 					TotalInBytes int64 `json:"total_in_bytes"`

@@ -2,13 +2,14 @@ package main
 
 import (
 	"flag"
-	"github.com/chamilad/kibana-prometheus-exporter/exporter"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/chamilad/kibana-prometheus-exporter/exporter"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -18,6 +19,7 @@ var (
 	kibanaUsername = flag.String("kibana.username", "", "The username to use for Kibana API")
 	kibanaPassword = flag.String("kibana.password", "", "The password to use for Kibana API")
 	kibanaSkipTls  = flag.Bool("kibana.skip-tls", false, "Skip TLS verification for TLS secured Kibana URLs")
+	debug          = flag.Bool("debug", false, "Output verbose details during metrics collection, use for development only")
 	namespace      = "kibana"
 )
 
@@ -32,9 +34,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	*kibanaUri = strings.TrimSuffix(*kibanaUri, "/")
 	log.Printf("using Kibana URL: %s", *kibanaUri)
 
-	err, exporter := exporter.NewExporter(*kibanaUri, *kibanaUsername, *kibanaPassword, namespace, *kibanaSkipTls)
+	err, exporter := exporter.NewExporter(*kibanaUri, *kibanaUsername, *kibanaPassword, namespace, *kibanaSkipTls, *debug)
 	if err != nil {
 		log.Fatal("error while initializing exporter: ", err)
 		os.Exit(1)

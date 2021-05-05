@@ -1,4 +1,4 @@
-# Prometheus Exporter for Kibana (7.5.*)
+# Prometheus Exporter for Kibana (7.10.*)
 
 A standalone Prometheus exporter for Kibana metrics inspired by the [Kibana Prometheus Exporter Plugin](https://github.com/pjhampton/kibana-prometheus-exporter/). 
 
@@ -28,16 +28,26 @@ The metrics exposed by this Exporter are the following.
 ## Usage
 The Docker Image can be used directly to run the exporter in a Dockerized environment. The Container filesystem only contains the statically linked binary, so that it can be run independently.
 
-> **NOTE**: Currently only tested against Kibana 7.5 versions. 
+> **NOTE**: Currently tested against below Kibana versions only.
+> 1. 7.5
+> 2. 7.8
+> 3. 7.10
+>
+> Please open an issue if you see errors or missing metrics with the Kibana version you're using.
+>
+> Match the Kibana version with the release tag (ex: release `v7.5.x.2` will work with Kibana `7.5.x` versions. It's possible it will continue to work for a few more minor releases, but this depends on what Elastic decides to do with the idea of semantic versioning)
+>
+> First 3 sections of the release tag represents the Kibana version compatibility, while the last section indicates patching increments.
+
 
 ```bash
 # expose metrics from the local Kibana instance using the provided username and password
-docker run -p 9684:9684 -it chamilad/kibana-prometheus-exporter:v7.5.x.1 -kibana.uri http://localhost:5601 -kibana.username elastic -kibana.password password
+docker run -p 9684:9684 -it chamilad/kibana-prometheus-exporter:v7.10.x.1 -kibana.uri http://localhost:5601 -kibana.username elastic -kibana.password password
 ```
 
 ```bash
 # expose metrics using /scrape endpint
-docker run -p 9684:9684 -it chamilad/kibana-prometheus-exporter:v7.5.x.1 -kibana.uri http://localhost:5601 -web.telemetry-path "/scrape"
+docker run -p 9684:9684 -it chamilad/kibana-prometheus-exporter:v7.10.x.1 -kibana.uri http://localhost:5601 -web.telemetry-path "/scrape"
 ```
 
 ### Kubernetes

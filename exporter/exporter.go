@@ -10,11 +10,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// A type that implements the prometheus.Collector interface. This will
+// Exporter implements the prometheus.Collector interface. This will
 // be used to register the metrics with Prometheus.
 type Exporter struct {
 	lock      sync.RWMutex
@@ -36,25 +37,41 @@ type Exporter struct {
 	reqTotal              prometheus.Gauge
 }
 
+// WaitForConnection is a method to block until Kibana becomes available
+func (e *Exporter) WaitForConnection() {
+	for {
+		_, err := e.collector.scrape()
+		if err != nil {
+			log.Print("waiting for Kibana to be responsive...")
+			// hardcoded since it's unlikely this is user controlled
+			time.Sleep(10 * time.Second)
+			continue
+		}
+
+		log.Print("kibana is up")
+		return
+	}
+}
+
 // NewExporter will create a Exporter struct and initialize the metrics
 // that will be scraped by Prometheus. It will use the provided Kibana
 // details to populate a KibanaCollector struct.
-func NewExporter(kUrl, kUname, kPwd, namespace string, skipTls bool, debug bool) (error, *Exporter) {
+func NewExporter(kURL, kUname, kPwd, namespace string, skipTLS, debug bool) (*Exporter, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
-		return errors.New("namespace cannot be empty"), nil
+		return nil, errors.New("namespace cannot be empty")
 	}
 
 	collector := &KibanaCollector{}
-	collector.url = kUrl
+	collector.url = kURL
 
-	if strings.HasPrefix(kUrl, "https://") {
-		if skipTls {
-			log.Printf("skipping TLS verification for Kibana URL %s", kUrl)
+	if strings.HasPrefix(kURL, "https://") {
+		if skipTLS {
+			log.Printf("skipping TLS verification for Kibana URL %s", kURL)
 		}
 
 		tConf := &tls.Config{
-			InsecureSkipVerify: skipTls,
+			InsecureSkipVerify: skipTLS,
 		}
 
 		tr := &http.Transport{
@@ -66,8 +83,8 @@ func NewExporter(kUrl, kUname, kPwd, namespace string, skipTls bool, debug bool)
 		}
 	} else {
 		collector.client = &http.Client{}
-		if skipTls {
-			log.Printf("kibana.skip-tls is enabled for an http URL, ignoring: %s", kUrl)
+		if skipTLS {
+			log.Printf("kibana.skip-tls is enabled for an http URL, ignoring: %s", kURL)
 		}
 	}
 
@@ -158,7 +175,7 @@ func NewExporter(kUrl, kUname, kPwd, namespace string, skipTls bool, debug bool)
 			}),
 	}
 
-	return nil, exporter
+	return exporter, nil
 }
 
 // parseMetrics will set the metrics values using the KibanaMetrics
@@ -225,7 +242,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	err, metrics := e.collector.scrape()
+	metrics, err := e.collector.scrape()
 	if err != nil {
 		log.Printf("error while scraping metrics from Kibana: %s", err)
 		return

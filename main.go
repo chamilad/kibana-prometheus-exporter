@@ -15,36 +15,45 @@ import (
 var (
 	addr           = flag.String("web.listen-address", ":9684", "The address to listen on for HTTP requests.")
 	metricsPath    = flag.String("web.telemetry-path", "/metrics", "The address to listen on for HTTP requests.")
-	kibanaUri      = flag.String("kibana.uri", "", "The Kibana API to fetch metrics from")
+	kibanaURI      = flag.String("kibana.uri", "", "The Kibana API to fetch metrics from")
 	kibanaUsername = flag.String("kibana.username", "", "The username to use for Kibana API")
 	kibanaPassword = flag.String("kibana.password", "", "The password to use for Kibana API")
-	kibanaSkipTls  = flag.Bool("kibana.skip-tls", false, "Skip TLS verification for TLS secured Kibana URLs")
+	kibanaSkipTLS  = flag.Bool("kibana.skip-tls", false, "Skip TLS verification for TLS secured Kibana URLs")
 	debug          = flag.Bool("debug", false, "Output verbose details during metrics collection, use for development only")
+	wait           = flag.Bool("wait", false, "Wait for Kibana to be responsive before starting, setting this to false would cause the exporter to error out instead of waiting")
 	namespace      = "kibana"
 )
 
 func main() {
 	flag.Parse()
-	*kibanaUri = strings.TrimSpace(*kibanaUri)
+	*kibanaURI = strings.TrimSpace(*kibanaURI)
 	*kibanaUsername = strings.TrimSpace(*kibanaUsername)
 	*kibanaPassword = strings.TrimSpace(*kibanaPassword)
 
-	if *kibanaUri == "" {
+	if *kibanaURI == "" {
 		log.Fatal("required flag -kibana.uri not provided, aborting")
 		os.Exit(1)
 	}
 
-	*kibanaUri = strings.TrimSuffix(*kibanaUri, "/")
-	log.Printf("using Kibana URL: %s", *kibanaUri)
+	*kibanaURI = strings.TrimSuffix(*kibanaURI, "/")
+	log.Printf("using Kibana URL: %s", *kibanaURI)
 
-	err, exporter := exporter.NewExporter(*kibanaUri, *kibanaUsername, *kibanaPassword, namespace, *kibanaSkipTls, *debug)
+	exporter, err := exporter.NewExporter(*kibanaURI, *kibanaUsername, *kibanaPassword, namespace, *kibanaSkipTLS, *debug)
 	if err != nil {
 		log.Fatal("error while initializing exporter: ", err)
 		os.Exit(1)
 	}
 
+	if *wait {
+		// blocking wait for Kibana to be responsive
+		exporter.WaitForConnection()
+	} else {
+		log.Print("not waiting for Kibana to be responsive")
+	}
+
 	prometheus.MustRegister(exporter)
 
+	// readable output
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
              <head><title>Kibana Exporter</title></head>

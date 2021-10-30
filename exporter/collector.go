@@ -2,13 +2,14 @@ package exporter
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/rs/zerolog/log"
 )
 
-// A type that collects the Kibana information together to be used by
+// KibanaCollector collects the Kibana information together to be used by
 // the exporter to scrape metrics.
 type KibanaCollector struct {
 	// url is the base URL of the Kibana instance or the service
@@ -24,7 +25,7 @@ type KibanaCollector struct {
 	client *http.Client
 }
 
-// A type that is used to unmarshal the metrics response from Kibana.
+// KibanaMetrics is used to unmarshal the metrics response from Kibana.
 type KibanaMetrics struct {
 	Status struct {
 		Overall struct {
@@ -64,38 +65,48 @@ type KibanaMetrics struct {
 // provided by the KibanaCollector struct, and return the metrics as a
 // KibanaMetrics representation.
 func (c *KibanaCollector) scrape() (*KibanaMetrics, error) {
+	log.Debug().
+		Msg("building request for api/status from kibana")
+
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/status", c.url), nil)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("could not initialize a request to scrape metrics: %s", err))
+		return nil, fmt.Errorf("could not initialize a request to scrape metrics: %s", err)
 	}
 
 	if c.authHeader != "" {
+		log.Debug().
+			Msg("adding auth header")
 		req.Header.Add("Authorization", c.authHeader)
 	}
 
 	req.Header.Add("Accept", "application/json")
 
+	log.Debug().
+		Msg("requesting api/status from kibana")
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("error while reading Kibana status: %s", err))
+		return nil, fmt.Errorf("error while reading Kibana status: %s", err)
 	}
 
 	defer resp.Body.Close()
 
+	log.Debug().
+		Msg("processing api/status response")
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New(fmt.Sprintf("invalid response from Kibana status: %s", resp.Status))
+		return nil, fmt.Errorf("invalid response from Kibana status: %s", resp.Status)
 
 	}
 
 	respContent, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("error while reading response from Kibana status: %s", err))
+		return nil, fmt.Errorf("error while reading response from Kibana status: %s", err)
 	}
 
 	metrics := &KibanaMetrics{}
 	err = json.Unmarshal(respContent, &metrics)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("error while unmarshalling Kibana status: %s\nProblematic content:\n%s", err, respContent))
+		return nil, fmt.Errorf("error while unmarshalling Kibana status: %s\nProblematic content:\n%s", err, respContent)
 	}
 
 	return metrics, nil

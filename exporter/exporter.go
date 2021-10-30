@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog/log"
 )
 
 // Exporter implements the prometheus.Collector interface. This will
@@ -20,7 +20,6 @@ import (
 type Exporter struct {
 	lock      sync.RWMutex
 	collector *KibanaCollector
-	debug     bool
 
 	// metrics
 	status                prometheus.Gauge
@@ -40,15 +39,20 @@ type Exporter struct {
 // WaitForConnection is a method to block until Kibana becomes available
 func (e *Exporter) WaitForConnection() {
 	for {
+		log.Debug().
+			Msg("checking for kibana status")
+
 		_, err := e.collector.scrape()
 		if err != nil {
-			log.Print("waiting for Kibana to be responsive...")
+			log.Info().
+				Msg("waiting for Kibana to be responsive...")
 			// hardcoded since it's unlikely this is user controlled
 			time.Sleep(10 * time.Second)
 			continue
 		}
 
-		log.Print("kibana is up")
+		log.Info().
+			Msg("kibana is up")
 		return
 	}
 }
@@ -56,7 +60,7 @@ func (e *Exporter) WaitForConnection() {
 // NewExporter will create a Exporter struct and initialize the metrics
 // that will be scraped by Prometheus. It will use the provided Kibana
 // details to populate a KibanaCollector struct.
-func NewExporter(kURL, kUname, kPwd, namespace string, skipTLS, debug bool) (*Exporter, error) {
+func NewExporter(kURL, kUname, kPwd, namespace string, skipTLS bool) (*Exporter, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return nil, errors.New("namespace cannot be empty")
@@ -66,8 +70,12 @@ func NewExporter(kURL, kUname, kPwd, namespace string, skipTLS, debug bool) (*Ex
 	collector.url = kURL
 
 	if strings.HasPrefix(kURL, "https://") {
+		log.Debug().
+			Msgf("kibana URL is a TLS one: %s", kURL)
+
 		if skipTLS {
-			log.Printf("skipping TLS verification for Kibana URL %s", kURL)
+			log.Info().
+				Msgf("skipping TLS verification for Kibana URL: %s", kURL)
 		}
 
 		tConf := &tls.Config{
@@ -82,24 +90,30 @@ func NewExporter(kURL, kUname, kPwd, namespace string, skipTLS, debug bool) (*Ex
 			Transport: tr,
 		}
 	} else {
+		log.Debug().
+			Msgf("kibana URL is a plain text one: %s", kURL)
+
 		collector.client = &http.Client{}
 		if skipTLS {
-			log.Printf("kibana.skip-tls is enabled for an http URL, ignoring: %s", kURL)
+			log.Info().
+				Msgf("kibana.skip-tls is enabled for an http URL, ignoring: %s", kURL)
 		}
 	}
 
 	if kUname != "" && kPwd != "" {
-		log.Printf("using authenticated requests with Kibana")
+		log.Debug().
+			Msg("using authenticated requests with Kibana")
+
 		creds := fmt.Sprintf("%s:%s", kUname, kPwd)
 		encCreds := base64.StdEncoding.EncodeToString([]byte(creds))
 		collector.authHeader = fmt.Sprintf("Basic %s", encCreds)
 	} else {
-		log.Print("Kibana username or password is not provided, assuming unauthenticated communication")
+		log.Info().
+			Msg("Kibana username or password is not provided, assuming unauthenticated communication")
 	}
 
 	exporter := &Exporter{
 		collector: collector,
-		debug:     debug,
 
 		status: prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -181,6 +195,9 @@ func NewExporter(kURL, kUname, kPwd, namespace string, skipTLS, debug bool) (*Ex
 // parseMetrics will set the metrics values using the KibanaMetrics
 // struct, converting values to float64 where needed.
 func (e *Exporter) parseMetrics(m *KibanaMetrics) error {
+	log.Trace().
+		Msg("parsing received metrics from kibana")
+
 	// any value other than "green" is assumed to be less than 1
 	statusVal := 0.0
 	if strings.ToLower(m.Status.Overall.State) == "green" {
@@ -239,28 +256,37 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect is the Exporter implementing prometheus.Collector
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	log.Trace().
+		Msg("a collect() call received")
+
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
+	log.Trace().
+		Msg("issueing a scrape() call to the collector")
+
 	metrics, err := e.collector.scrape()
 	if err != nil {
-		log.Printf("error while scraping metrics from Kibana: %s", err)
+		log.Error().
+			Msgf("error while scraping metrics from Kibana: %s", err)
 		return
 	}
 
-	if e.debug {
-		op, _ := json.Marshal(metrics)
-		log.Printf("returned metrics: %s", string(op))
-	}
+	// output for debugging
+	op, _ := json.Marshal(metrics)
+	log.Debug().
+		Msgf("returned metrics: %s", string(op))
 
 	err = e.parseMetrics(metrics)
 	if err != nil {
-		log.Printf("error while parsing metrics from Kibana: %s", err)
+		log.Error().
+			Msgf("error while parsing metrics from Kibana: %s", err)
 		return
 	}
 
 	err = e.send(ch)
 	if err != nil {
-		log.Printf("error while responding to Prometheus with metrics: %s", err)
+		log.Error().
+			Msgf("error while responding to Prometheus with metrics: %s", err)
 	}
 }

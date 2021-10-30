@@ -62,6 +62,8 @@ kibana-exporter -kibana.uri https://kibana.local:5601 -kibana.skip-tls true
         The Kibana API to fetch metrics from
   -kibana.username string
         The username to use for Kibana API
+  -wait
+        Wait for Kibana to be responsive before starting, setting this to false would cause the exporter to error out instead of waiting
   -web.listen-address string
         The address to listen on for HTTP requests. (default ":9684")
   -web.telemetry-path string
@@ -160,10 +162,11 @@ The metrics exposed by this Exporter are the following.
 3. Add more metrics related to the scrape job itself
 4. Add a Grafana dashboards with (Prometheus) alerts 
 5. Add mTLS to the metrics server
-6. Add an initial connection test and fail early
 
 ## Contributing
 More metrics, useful tweaks, samples, bug fixes, and any other form of contributions are welcome. Please fork, modify, and open a PR. Please open a GitHub issue for observed bugs or feature requests. I will try to attend to them when possible.
+
+I haven't figured out testing unfortunately, once I have it'll be easier to test changes. Until then, start up basic Elastic and Kibana instances if you're testing dev changes.
 
 ## License
 The contents of this repository are licensed under Apache V2 License. 

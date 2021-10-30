@@ -2,14 +2,14 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/chamilad/kibana-prometheus-exporter/exporter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -25,30 +25,39 @@ var (
 )
 
 func main() {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+
 	flag.Parse()
 	*kibanaURI = strings.TrimSpace(*kibanaURI)
 	*kibanaUsername = strings.TrimSpace(*kibanaUsername)
 	*kibanaPassword = strings.TrimSpace(*kibanaPassword)
 
+	if *debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+
 	if *kibanaURI == "" {
-		log.Fatal("required flag -kibana.uri not provided, aborting")
-		os.Exit(1)
+		log.Fatal().
+			Msg("required flag -kibana.uri not provided, aborting")
 	}
 
 	*kibanaURI = strings.TrimSuffix(*kibanaURI, "/")
 	log.Printf("using Kibana URL: %s", *kibanaURI)
 
-	exporter, err := exporter.NewExporter(*kibanaURI, *kibanaUsername, *kibanaPassword, namespace, *kibanaSkipTLS, *debug)
+	exporter, err := exporter.NewExporter(*kibanaURI, *kibanaUsername, *kibanaPassword, namespace, *kibanaSkipTLS)
 	if err != nil {
-		log.Fatal("error while initializing exporter: ", err)
-		os.Exit(1)
+		log.Fatal().
+			Msgf("error while initializing exporter: %s", err)
 	}
 
 	if *wait {
 		// blocking wait for Kibana to be responsive
 		exporter.WaitForConnection()
 	} else {
-		log.Print("not waiting for Kibana to be responsive")
+		log.Info().
+			Msg("not waiting for Kibana to be responsive")
 	}
 
 	prometheus.MustRegister(exporter)
@@ -66,6 +75,8 @@ func main() {
 
 	http.Handle(*metricsPath, promhttp.Handler())
 
-	log.Printf("starting metrics server at %s", *addr)
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	log.Info().
+		Msgf("starting metrics server at %s", *addr)
+	log.Fatal().
+		Msgf("%s", http.ListenAndServe(*addr, nil))
 }

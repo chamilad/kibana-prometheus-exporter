@@ -22,6 +22,10 @@ release: clean
 	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -a -o ${TARGET}/release/${BINARY}-${VERSION}-linux-amd64
 	chmod -R +x ${TARGET}/release
 
+test: $(BINARY)
+	test -d tmp
+	cp ${TARGET}/${BINARY} tmp/
+
 docker: clean release
 	docker build --build-arg OS=linux --build-arg ARCH=amd64 --build-arg VERSION=${VERSION} -t chamilad/${IMG}:${VERSION} .
 

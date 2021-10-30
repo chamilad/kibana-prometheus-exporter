@@ -63,10 +63,10 @@ type KibanaMetrics struct {
 // scrape will connect to the Kibana instance, using the details
 // provided by the KibanaCollector struct, and return the metrics as a
 // KibanaMetrics representation.
-func (c *KibanaCollector) scrape() (error, *KibanaMetrics) {
+func (c *KibanaCollector) scrape() (*KibanaMetrics, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/status", c.url), nil)
 	if err != nil {
-		return errors.New(fmt.Sprintf("could not initialize a request to scrape metrics: %s", err)), nil
+		return nil, errors.New(fmt.Sprintf("could not initialize a request to scrape metrics: %s", err))
 	}
 
 	if c.authHeader != "" {
@@ -77,26 +77,26 @@ func (c *KibanaCollector) scrape() (error, *KibanaMetrics) {
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return errors.New(fmt.Sprintf("error while reading Kibana status: %s", err)), nil
+		return nil, errors.New(fmt.Sprintf("error while reading Kibana status: %s", err))
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.New(fmt.Sprintf("invalid response from Kibana status: %s", resp.Status)), nil
+		return nil, errors.New(fmt.Sprintf("invalid response from Kibana status: %s", resp.Status))
 
 	}
 
 	respContent, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return errors.New(fmt.Sprintf("error while reading response from Kibana status: %s", err)), nil
+		return nil, errors.New(fmt.Sprintf("error while reading response from Kibana status: %s", err))
 	}
 
 	metrics := &KibanaMetrics{}
 	err = json.Unmarshal(respContent, &metrics)
 	if err != nil {
-		return errors.New(fmt.Sprintf("error while unmarshalling Kibana status: %s\nProblematic content:\n%s", err, respContent)), nil
+		return nil, errors.New(fmt.Sprintf("error while unmarshalling Kibana status: %s\nProblematic content:\n%s", err, respContent))
 	}
 
-	return nil, metrics
+	return metrics, nil
 }

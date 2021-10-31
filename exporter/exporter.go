@@ -3,7 +3,6 @@ package exporter
 import (
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -257,7 +256,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect is the Exporter implementing prometheus.Collector
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.Trace().
-		Msg("a collect() call received")
+		Msg("a Collect() call received")
 
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -273,9 +272,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	// output for debugging
-	op, _ := json.Marshal(metrics)
 	log.Debug().
-		Msgf("returned metrics: %s", string(op))
+		Interface("metrics", metrics).
+		Msg("returned metrics content")
 
 	err = e.parseMetrics(metrics)
 	if err != nil {

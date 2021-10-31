@@ -95,7 +95,6 @@ func (c *KibanaCollector) scrape() (*KibanaMetrics, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("invalid response from Kibana status: %s", resp.Status)
-
 	}
 
 	respContent, err := ioutil.ReadAll(resp.Body)

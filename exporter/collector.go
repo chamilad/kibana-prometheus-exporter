@@ -1,10 +1,14 @@
 package exporter
 
 import (
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -59,6 +63,90 @@ type KibanaMetrics struct {
 			Total       int `json:"total"`
 		} `json:"requests"`
 	} `json:"metrics"`
+}
+
+// TestConnection checks whether the connection to Kibana is healthy
+func (c *KibanaCollector) TestConnection() bool {
+	log.Debug().
+		Msg("checking for kibana status")
+
+	_, err := c.scrape()
+	if err != nil {
+		log.Info().
+			Msgf("test connection to kibana failed: %s", err)
+		return false
+	}
+
+	return true
+}
+
+// WaitForConnection is a method to block until Kibana becomes available
+func (c *KibanaCollector) WaitForConnection() {
+	for {
+		if !c.TestConnection() {
+			log.Info().
+				Msg("waiting for kibana to be responsive")
+
+			// hardcoded since it's unlikely this is user controlled
+			time.Sleep(10 * time.Second)
+			continue
+		}
+
+		log.Info().
+			Msg("kibana is up")
+		return
+	}
+}
+
+// NewCollector builds a KibanaCollector struct
+func NewCollector(kibanaURI, kibanaUsername, kibanaPassword string, kibanaSkipTLS bool) (*KibanaCollector, error) {
+	collector := &KibanaCollector{}
+	collector.url = kibanaURI
+
+	if strings.HasPrefix(kibanaURI, "https://") {
+		log.Debug().
+			Msgf("kibana URL is a TLS one: %s", kibanaURI)
+
+		if kibanaSkipTLS {
+			log.Info().
+				Msgf("skipping TLS verification for Kibana URL: %s", kibanaURI)
+		}
+
+		tConf := &tls.Config{
+			InsecureSkipVerify: kibanaSkipTLS,
+		}
+
+		tr := &http.Transport{
+			TLSClientConfig: tConf,
+		}
+
+		collector.client = &http.Client{
+			Transport: tr,
+		}
+	} else {
+		log.Debug().
+			Msgf("kibana URL is a plain text one: %s", kibanaURI)
+
+		collector.client = &http.Client{}
+		if kibanaSkipTLS {
+			log.Info().
+				Msgf("kibana.skip-tls is enabled for an http URL, ignoring: %s", kibanaURI)
+		}
+	}
+
+	if kibanaUsername != "" && kibanaPassword != "" {
+		log.Debug().
+			Msg("using authenticated requests with Kibana")
+
+		creds := fmt.Sprintf("%s:%s", kibanaUsername, kibanaPassword)
+		encCreds := base64.StdEncoding.EncodeToString([]byte(creds))
+		collector.authHeader = fmt.Sprintf("Basic %s", encCreds)
+	} else {
+		log.Info().
+			Msg("Kibana username or password is not provided, assuming unauthenticated communication")
+	}
+
+	return collector, nil
 }
 
 // scrape will connect to the Kibana instance, using the details

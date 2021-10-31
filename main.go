@@ -46,7 +46,8 @@ func main() {
 	*kibanaURI = strings.TrimSuffix(*kibanaURI, "/")
 	log.Printf("using Kibana URL: %s", *kibanaURI)
 
-	exporter, err := exporter.NewExporter(*kibanaURI, *kibanaUsername, *kibanaPassword, namespace, *kibanaSkipTLS)
+	collector, err := exporter.NewCollector(*kibanaURI, *kibanaUsername, *kibanaPassword, *kibanaSkipTLS)
+	exporter, err := exporter.NewExporter(namespace, collector)
 	if err != nil {
 		log.Fatal().
 			Msgf("error while initializing exporter: %s", err)
@@ -54,10 +55,12 @@ func main() {
 
 	if *wait {
 		// blocking wait for Kibana to be responsive
-		exporter.WaitForConnection()
+		collector.WaitForConnection()
 	} else {
-		log.Info().
-			Msg("not waiting for Kibana to be responsive")
+		if !collector.TestConnection() {
+			log.Fatal().
+				Msg("not waiting for Kibana to be responsive")
+		}
 	}
 
 	prometheus.MustRegister(exporter)

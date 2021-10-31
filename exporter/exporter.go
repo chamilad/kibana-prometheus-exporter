@@ -1,14 +1,9 @@
 package exporter
 
 import (
-	"crypto/tls"
-	"encoding/base64"
 	"errors"
-	"fmt"
-	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
@@ -35,80 +30,13 @@ type Exporter struct {
 	reqTotal              prometheus.Gauge
 }
 
-// WaitForConnection is a method to block until Kibana becomes available
-func (e *Exporter) WaitForConnection() {
-	for {
-		log.Debug().
-			Msg("checking for kibana status")
-
-		_, err := e.collector.scrape()
-		if err != nil {
-			log.Info().
-				Msg("waiting for Kibana to be responsive...")
-			// hardcoded since it's unlikely this is user controlled
-			time.Sleep(10 * time.Second)
-			continue
-		}
-
-		log.Info().
-			Msg("kibana is up")
-		return
-	}
-}
-
 // NewExporter will create a Exporter struct and initialize the metrics
 // that will be scraped by Prometheus. It will use the provided Kibana
 // details to populate a KibanaCollector struct.
-func NewExporter(kURL, kUname, kPwd, namespace string, skipTLS bool) (*Exporter, error) {
+func NewExporter(namespace string, collector *KibanaCollector) (*Exporter, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return nil, errors.New("namespace cannot be empty")
-	}
-
-	collector := &KibanaCollector{}
-	collector.url = kURL
-
-	if strings.HasPrefix(kURL, "https://") {
-		log.Debug().
-			Msgf("kibana URL is a TLS one: %s", kURL)
-
-		if skipTLS {
-			log.Info().
-				Msgf("skipping TLS verification for Kibana URL: %s", kURL)
-		}
-
-		tConf := &tls.Config{
-			InsecureSkipVerify: skipTLS,
-		}
-
-		tr := &http.Transport{
-			TLSClientConfig: tConf,
-		}
-
-		collector.client = &http.Client{
-			Transport: tr,
-		}
-	} else {
-		log.Debug().
-			Msgf("kibana URL is a plain text one: %s", kURL)
-
-		collector.client = &http.Client{}
-		if skipTLS {
-			log.Info().
-				Msgf("kibana.skip-tls is enabled for an http URL, ignoring: %s", kURL)
-		}
-	}
-
-	if kUname != "" && kPwd != "" {
-		log.Debug().
-			Msg("using authenticated requests with Kibana")
-
-		creds := fmt.Sprintf("%s:%s", kUname, kPwd)
-		encCreds := base64.StdEncoding.EncodeToString([]byte(creds))
-		collector.authHeader = fmt.Sprintf("Basic %s", encCreds)
-	} else {
-		log.Info().
-			Msg("Kibana username or password is not provided, assuming unauthenticated communication")
 	}
 
 	exporter := &Exporter{

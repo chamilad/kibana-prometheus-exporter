@@ -1,6 +1,5 @@
----
-name: run-tests-on-push
-run-name: Running unit tests on ${{ github.base_ref }} branch
+name: lint-on-push
+run-name: Running linting ${{ github.base_ref }} branch
 on:
   - push
 
@@ -18,8 +17,8 @@ jobs:
       - name: Dependencies
         run: go get .
 
-      - name: Test
-        run: go test -v ./...
+      - name: Fmt
+        run: if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then exit 1; fi
 
-      - name: Build
-        run: mkdir -p outputs/ && go build -ldflags "-extldflags '-static' -s -w" -a 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3

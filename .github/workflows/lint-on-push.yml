@@ -1,8 +1,12 @@
 ---
 name: lint-on-push
-run-name: Running linting ${{ github.ref }} ${{ github.ref_type }}
+run-name: Running linting ${{ github.ref_name }} ${{ github.ref_type }}
 on:
-  - push
+  push:
+    branches:
+      - "**"
+    tags-ignore:
+      - "**"
 
 jobs:
   test:

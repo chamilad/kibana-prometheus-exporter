@@ -1,6 +1,6 @@
 ---
 name: build-on-tag-creation
-run-name: Running build on ${{ github.ref }} ${{ github.ref_type }}
+run-name: Running build on ${{ github.ref_name }} ${{ github.ref_type }}
 on:
   push:
     tags:
@@ -41,4 +41,5 @@ jobs:
       - name: Upload build artefact
         uses: actions/upload-artifact@v3
         with:
-          path: outputs/kibana_exporter_$GITHUB_REF_$GOOS_$GOARCH
+          path: outputs/kibana_exporter_${{ env.GITHUB_REF }}_${{ env.GOOS }}_${{ env.GOARCH }}
+          name: kibana_exporter_${{ env.GITHUB_REF }}_${{ env.GOOS }}_${{ env.GOARCH }}

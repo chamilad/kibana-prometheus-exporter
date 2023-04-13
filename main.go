@@ -21,11 +21,11 @@ var (
 	kibanaSkipTLS  = flag.Bool("kibana.skip-tls", false, "Skip TLS verification for TLS secured Kibana URLs")
 	debug          = flag.Bool("debug", false, "Output verbose details during metrics collection, use for development only")
 	wait           = flag.Bool(
-    "wait",
-    false,
-    "Wait for Kibana to be responsive before starting, setting this to false would cause the exporter to error out instead of waiting",
-  )
-	namespace      = "kibana"
+		"wait",
+		false,
+		"Wait for Kibana to be responsive before starting, setting this to false would cause the exporter to error out instead of waiting",
+	)
+	namespace = "kibana"
 )
 
 func main() {
@@ -83,8 +83,8 @@ func main() {
              <p><a href='` + *metricsPath + `'>Metrics</a></p>
              </body>
              </html>`))
-    log.Warn().
-      Msgf("error while writing response to /metrics call: %s", err)
+		log.Warn().
+			Msgf("error while writing response to /metrics call: %s", err)
 	})
 
 	http.Handle(*metricsPath, promhttp.Handler())

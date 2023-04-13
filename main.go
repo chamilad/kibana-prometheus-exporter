@@ -20,7 +20,11 @@ var (
 	kibanaPassword = flag.String("kibana.password", "", "The password to use for Kibana API")
 	kibanaSkipTLS  = flag.Bool("kibana.skip-tls", false, "Skip TLS verification for TLS secured Kibana URLs")
 	debug          = flag.Bool("debug", false, "Output verbose details during metrics collection, use for development only")
-	wait           = flag.Bool("wait", false, "Wait for Kibana to be responsive before starting, setting this to false would cause the exporter to error out instead of waiting")
+	wait           = flag.Bool(
+    "wait",
+    false,
+    "Wait for Kibana to be responsive before starting, setting this to false would cause the exporter to error out instead of waiting",
+  )
 	namespace      = "kibana"
 )
 
@@ -47,6 +51,11 @@ func main() {
 	log.Printf("using Kibana URL: %s", *kibanaURI)
 
 	collector, err := exporter.NewCollector(*kibanaURI, *kibanaUsername, *kibanaPassword, *kibanaSkipTLS)
+	if err != nil {
+		log.Fatal().
+			Msgf("error while initializing collector: %s", err)
+	}
+
 	exporter, err := exporter.NewExporter(namespace, collector)
 	if err != nil {
 		log.Fatal().
@@ -67,13 +76,15 @@ func main() {
 
 	// readable output
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
+		_, err = w.Write([]byte(`<html>
              <head><title>Kibana Exporter</title></head>
              <body>
              <h1>Kibana Exporter</h1>
              <p><a href='` + *metricsPath + `'>Metrics</a></p>
              </body>
              </html>`))
+    log.Warn().
+      Msgf("error while writing response to /metrics call: %s", err)
 	})
 
 	http.Handle(*metricsPath, promhttp.Handler())

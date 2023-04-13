@@ -1,3 +1,4 @@
+---
 name: lint-on-push
 run-name: Running linting ${{ github.base_ref }} branch
 on:
@@ -22,3 +23,5 @@ jobs:
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
+        with:
+          only-new-issues: true

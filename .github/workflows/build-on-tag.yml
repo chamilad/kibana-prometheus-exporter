@@ -1,0 +1,44 @@
+---
+name: build-on-tag-creation
+run-name: Running build on ${{ github.ref }} ${{ github.ref_type }}
+on:
+  push:
+    tags:
+      - "**"
+
+env:
+  GOOS: linux
+  GOARCH: amd64
+  # net/http might need disabling CGO
+  CGO_ENABLED: 0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
+
+      - name: Dependencies
+        run: go get .
+
+      - name: Fmt
+        run: if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then exit 1; fi
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+
+      - name: Test
+        run: go test -v ./...
+
+      - name: Build
+        run: mkdir -p outputs/ && go build -ldflags "-extldflags '-static' -s -w" -a -o outputs/kibana_exporter_$GITHUB_REF_$GOOS_$GOARCH
+
+      - name: Upload build artefact
+        uses: actions/upload-artifact@v3
+        with:
+          path: outputs/kibana_exporter_$GITHUB_REF_$GOOS_$GOARCH

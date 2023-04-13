@@ -2,7 +2,7 @@
 BINARY="kibana_exporter"
 IMG="kibana-prometheus-exporter"
 TARGET="build"
-VERSION="v7.10.x.2-latest"
+VERSION="v8.5.x.1-latest"
 
 # explicitly go mod
 export GO111MODULE=on
@@ -31,6 +31,7 @@ docker: clean release
 
 docker-release: clean release docker
 	docker push chamilad/${IMG}:${VERSION}
+
 clean:
 	go clean
 	rm -rf ${TARGET}

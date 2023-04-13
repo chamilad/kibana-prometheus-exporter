@@ -13,13 +13,18 @@ env:
   CGO_ENABLED: 0
 
 jobs:
-  echo:
+  pre:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
+      - name: Extract tag name
+        id: vars
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
       - name: echo
-        run: echo "running on ${GITHUB_REF}"
+        run: |
+          echo "running on ${{ steps.vars.outputs.tag }}"
 
   lint:
     runs-on: ubuntu-latest
@@ -68,11 +73,19 @@ jobs:
       - name: Dependencies
         run: go get .
 
-      - name: Build on tag ${{ vars.GITHUB_REF }}
-        run: mkdir -p outputs/ && go build -ldflags "-extldflags '-static' -s -w" -a -o outputs/kibana_exporter_${GITHUB_REF}_${GOOS}_${GOARCH}
+      - name: Extract tag name
+        id: vars
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: Build on tag ${{ steps.vars.outputs.tag }}
+        env:
+          TAG_NAME: ${{ steps.vars.outputs.tag }}
+        run: |
+          mkdir -p outputs/
+          go build -ldflags "-extldflags '-static' -s -w" -a -o outputs/kibana_exporter_${TAG_NAME}_${GOOS}_${GOARCH}
 
       - name: Upload build artefact
         uses: actions/upload-artifact@v3
         with:
-          path: outputs/kibana_exporter_${{ env.GITHUB_REF }}_${{ env.GOOS }}_${{ env.GOARCH }}
-          name: kibana_exporter_${{ env.GITHUB_REF }}_${{ env.GOOS }}_${{ env.GOARCH }}
+          path: outputs/kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+          name: kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}

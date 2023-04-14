@@ -19,17 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.19
-
-      - name: Fmt
-        run: if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then exit 1; fi
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+      - uses: ./github/workflows/composite-linter
 
   test:
     runs-on: ubuntu-latest
@@ -73,11 +63,23 @@ jobs:
           mkdir -p outputs/
           go build -ldflags "-extldflags '-static' -s -w" -a -o outputs/${{ env.BINARY_NAME }}-${TAG_NAME}-${GOOS}-${GOARCH}
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@main
+
+      - name: Sign the images with GitHub OIDC Token **not production ready**
+        run: cosign sign-blob --yes outputs/${{ env.BINARY_NAME }}-${TAG_NAME}-${GOOS}-${GOARCH} > outputs/${{ env.BINARY_NAME }}-${TAG_NAME}-${GOOS}-${GOARCH}.sig
+
       - name: Upload build artefact
         uses: actions/upload-artifact@v3
         with:
           path: outputs/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
           name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+
+      - name: Upload signature artefact
+        uses: actions/upload-artifact@v3
+        with:
+          path: outputs/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
+          name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
 
   image:
     runs-on: ubuntu-latest
@@ -134,6 +136,11 @@ jobs:
         with:
           name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
 
+      - name: Download signature artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
+
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
@@ -148,3 +155,4 @@ jobs:
             Please refer to the [README.md ](README.md) for the usage details.
           files: |
             ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+            ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig

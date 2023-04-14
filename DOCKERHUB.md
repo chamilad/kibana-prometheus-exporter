@@ -1,6 +1,6 @@
 # Prometheus Exporter for Kibana (7.10.*)
 
-A standalone Prometheus exporter for Kibana metrics inspired by the [Kibana Prometheus Exporter Plugin](https://github.com/pjhampton/kibana-prometheus-exporter/). 
+A standalone Prometheus exporter for Kibana metrics inspired by the [Kibana Prometheus Exporter Plugin](https://github.com/pjhampton/kibana-prometheus-exporter/).
 
 This makes use of the `/api/status` endpoint to gather and convert metrics to the Prometheus OpenMetrics format.
 
@@ -51,7 +51,7 @@ docker run -p 9684:9684 -it chamilad/kibana-prometheus-exporter:v7.10.x.1 -kiban
 ```
 
 ### Kubernetes
-Refer the artifacts in [`k8s`](k8s) directory. There is a Deployment and a Service that exposes the Deployment. 
+Refer the artifacts in [`k8s`](k8s) directory. There is a Deployment and a Service that exposes the Deployment.
 
 ```bash
 kubectl apply -f k8s/kibana-prometheus-exporter.yaml
@@ -61,13 +61,13 @@ kubectl apply -f k8s/kibana-prometheus-exporter.yaml
 $  kubectl get all -l app=kibana-prometheus-exporter
   NAME                                             READY   STATUS    RESTARTS   AGE
   pod/kibana-prometheus-exporter-b8c888bcd-66kvx   1/1     Running   0          16s
-  
+
   NAME                                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
   service/kibana-prometheus-exporter   ClusterIP   10.96.252.18   <none>        9684/TCP   16s
-  
+
   NAME                                         READY   UP-TO-DATE   AVAILABLE   AGE
   deployment.apps/kibana-prometheus-exporter   1/1     1            1           16s
-  
+
   NAME                                                   DESIRED   CURRENT   READY   AGE
   replicaset.apps/kibana-prometheus-exporter-b8c888bcd   1         1         1       16s
 ```
@@ -94,11 +94,10 @@ With these artifacts deployed, the following Prometheus scrape configuration can
 ```
 
 ##### Things to note about the Prometheus Scrape Config
- 
+
 1. The `scrape_interval` for the job is kept to once per minute. This is to reduce the load on the ElasticSearch cluster, by frequent API calls.
-2. The port to connect is detected through a K8s Service annotation, `prometheus.io/port`. 
+2. The port to connect is detected through a K8s Service annotation, `prometheus.io/port`.
 3. The metrics will end up with the label `job: kibana`
 
 ## License
-The contents of this repository are licensed under Apache V2 License. 
-
+The contents of this repository are licensed under Apache V2 License.

@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -112,6 +112,7 @@ func NewCollector(kibanaURI, kibanaUsername, kibanaPassword string, kibanaSkipTL
 				Msgf("skipping TLS verification for Kibana URL: %s", kibanaURI)
 		}
 
+		//#nosec G402 -- user defined
 		tConf := &tls.Config{
 			InsecureSkipVerify: kibanaSkipTLS,
 		}
@@ -176,7 +177,12 @@ func (c *KibanaCollector) scrape() (*KibanaMetrics, error) {
 		return nil, fmt.Errorf("error while reading Kibana status: %s", err)
 	}
 
-	defer resp.Body.Close()
+	// CWE-703
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Warn().Msgf("error while closing response body: %s", err)
+		}
+	}()
 
 	log.Debug().
 		Msg("processing api/status response")
@@ -185,7 +191,7 @@ func (c *KibanaCollector) scrape() (*KibanaMetrics, error) {
 		return nil, fmt.Errorf("invalid response from Kibana status: %s", resp.Status)
 	}
 
-	respContent, err := ioutil.ReadAll(resp.Body)
+	respContent, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error while reading response from Kibana status: %s", err)
 	}

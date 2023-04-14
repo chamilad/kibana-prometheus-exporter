@@ -1,0 +1,17 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: kibana-exporter
+  labels:
+    app: kibana-prometheus-exporter
+  annotations:
+    prometheus.io/port: "9684"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9684
+      protocol: TCP
+  selector:
+    app: kibana-prometheus-exporter

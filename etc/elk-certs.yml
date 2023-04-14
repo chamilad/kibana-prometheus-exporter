@@ -2,4 +2,3 @@
 instances:
   - name: "kibana"
     dns: [ "kibana.local" ]
-

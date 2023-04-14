@@ -48,21 +48,9 @@ spec:
               memory: 50Mi
           ports:
             - containerPort: 9684
-
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: kibana-exporter
-  labels:
-    app: kibana-prometheus-exporter
-  annotations:
-    prometheus.io/port: "9684"
-spec:
-  type: ClusterIP
-  ports:
-    - name: http
-      port: 9684
-      protocol: TCP
-  selector:
-    app: kibana-prometheus-exporter
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9684
+            initialDelaySeconds: 10
+            periodSeconds: 10

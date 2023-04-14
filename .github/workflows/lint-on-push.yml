@@ -1,6 +1,6 @@
 ---
 name: lint-on-push
-run-name: Running linting ${{ github.ref_name }} ${{ github.ref_type }}
+run-name: Running linting on ${{ github.ref_name }} ${{ github.ref_type }}
 on:
   push:
     branches:
@@ -9,7 +9,7 @@ on:
       - "**"
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -22,10 +22,11 @@ jobs:
       - name: Dependencies
         run: go get .
 
-      - name: Fmt
-        run: if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then exit 1; fi
+      - name: Install pre-commit tools
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.52.2
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          only-new-issues: true
+      - uses: pre-commit/action@v3.0.0

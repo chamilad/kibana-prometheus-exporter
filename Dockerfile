@@ -7,4 +7,3 @@ COPY build/release/${BINARY} /bin/kibana_exporter
 
 ENTRYPOINT ["/bin/kibana_exporter"]
 EXPOSE     9684
-

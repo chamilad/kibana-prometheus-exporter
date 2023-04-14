@@ -4,6 +4,7 @@ import (
 	"flag"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/chamilad/kibana-prometheus-exporter/exporter"
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,8 +44,7 @@ func main() {
 	}
 
 	if *kibanaURI == "" {
-		log.Fatal().
-			Msg("required flag -kibana.uri not provided, aborting")
+		log.Fatal().Msg("required flag -kibana.uri not provided, aborting")
 	}
 
 	*kibanaURI = strings.TrimSuffix(*kibanaURI, "/")
@@ -52,24 +52,19 @@ func main() {
 
 	collector, err := exporter.NewCollector(*kibanaURI, *kibanaUsername, *kibanaPassword, *kibanaSkipTLS)
 	if err != nil {
-		log.Fatal().
-			Msgf("error while initializing collector: %s", err)
+		log.Fatal().Msgf("error while initializing collector: %s", err)
 	}
 
 	exporter, err := exporter.NewExporter(namespace, collector)
 	if err != nil {
-		log.Fatal().
-			Msgf("error while initializing exporter: %s", err)
+		log.Fatal().Msgf("error while initializing exporter: %s", err)
 	}
 
 	if *wait {
 		// blocking wait for Kibana to be responsive
 		collector.WaitForConnection()
-	} else {
-		if !collector.TestConnection() {
-			log.Fatal().
-				Msg("not waiting for Kibana to be responsive")
-		}
+	} else if !collector.TestConnection() {
+		log.Fatal().Msg("not waiting for Kibana to be responsive")
 	}
 
 	prometheus.MustRegister(exporter)
@@ -83,14 +78,29 @@ func main() {
              <p><a href='` + *metricsPath + `'>Metrics</a></p>
              </body>
              </html>`))
-		log.Warn().
-			Msgf("error while writing response to /metrics call: %s", err)
+
+		log.Warn().Msgf("error while writing response to /metrics call: %s", err)
+	})
+
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 	})
 
 	http.Handle(*metricsPath, promhttp.Handler())
 
-	log.Info().
-		Msgf("starting metrics server at %s", *addr)
-	log.Fatal().
-		Msgf("%s", http.ListenAndServe(*addr, nil))
+	log.Info().Msgf("starting metrics server at %s", *addr)
+	// CWE-676, https://app.deepsource.com/directory/analyzers/go/issues/GO-S2114
+	server := &http.Server{
+		Addr:              *addr,
+		ReadHeaderTimeout: 3 * time.Second, // low timeout since the response is straightforward
+	}
+
+	err = server.ListenAndServe()
+	log.Fatal().Msgf("%s", err)
 }

@@ -48,6 +48,12 @@ spec:
               memory: 50Mi
           ports:
             - containerPort: 9684
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9684
+            initialDelaySeconds: 10
+            periodSeconds: 10
 
 ---
 kind: Service

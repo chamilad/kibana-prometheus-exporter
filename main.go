@@ -87,6 +87,16 @@ func main() {
 			Msgf("error while writing response to /metrics call: %s", err)
 	})
 
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+	})
+
 	http.Handle(*metricsPath, promhttp.Handler())
 
 	log.Info().

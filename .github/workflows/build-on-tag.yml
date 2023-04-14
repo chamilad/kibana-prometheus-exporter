@@ -140,9 +140,11 @@ jobs:
           draft: true
           name: Release ${{ steps.vars.outputs.tag }}
           body: |
-            auto generated, will be replaced pretty soon with good stuff
+            \<auto generated, will be replaced pretty soon with good stuff\>
 
             DockerHub: `docker pull chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
             GHCR: `docker pull ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
+
+            Please refer to the [README.md ](README.md) for the usage details.
           files: |
             ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}

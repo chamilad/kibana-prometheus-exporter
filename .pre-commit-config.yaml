@@ -21,6 +21,3 @@ repos:
       - id: go-staticcheck-mod
       - id: go-critic
       - id: golangci-lint-mod
-
-ci:
-  autofix_prs: false

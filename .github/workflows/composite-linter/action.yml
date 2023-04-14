@@ -1,0 +1,26 @@
+---
+name: Pre-commit Checks
+description: Run pre-commit checks
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.19
+
+    - name: Dependencies
+      shell: bash
+      run: go get .
+
+    - name: Install pre-commit tools
+      shell: bash
+      run: |
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        go install honnef.co/go/tools/cmd/staticcheck@latest
+        go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.52.2
+
+    - uses: pre-commit/action@v3.0.0

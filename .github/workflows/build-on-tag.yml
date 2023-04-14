@@ -100,6 +100,12 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+          path: build/release/kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:

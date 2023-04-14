@@ -67,6 +67,8 @@ jobs:
         uses: sigstore/cosign-installer@main
 
       - name: Sign the images with GitHub OIDC Token **not production ready**
+        env:
+          TAG_NAME: ${{ steps.vars.outputs.tag }}
         run: cosign sign-blob --yes outputs/${{ env.BINARY_NAME }}-${TAG_NAME}-${GOOS}-${GOARCH} > outputs/${{ env.BINARY_NAME }}-${TAG_NAME}-${GOOS}-${GOARCH}.sig
 
       - name: Upload build artefact
@@ -123,7 +125,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: image
+    needs: build
     steps:
       - uses: actions/checkout@v3
 

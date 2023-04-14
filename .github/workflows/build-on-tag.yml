@@ -41,6 +41,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: test
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
     steps:
       - uses: actions/checkout@v3
 
@@ -66,7 +71,7 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
 
-      - name: Sign the images with GitHub OIDC Token **not production ready**
+      - name: Sign the images with GitHub OIDC Token
         env:
           TAG_NAME: ${{ steps.vars.outputs.tag }}
         run: cosign sign-blob --yes outputs/${{ env.BINARY_NAME }}-${TAG_NAME}-${GOOS}-${GOARCH} > outputs/${{ env.BINARY_NAME }}-${TAG_NAME}-${GOOS}-${GOARCH}.sig

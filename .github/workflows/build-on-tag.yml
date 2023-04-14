@@ -13,19 +13,6 @@ env:
   CGO_ENABLED: 0
 
 jobs:
-  pre:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Extract tag name
-        id: vars
-        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
-
-      - name: echo
-        run: |
-          echo "running on ${{ steps.vars.outputs.tag }}"
-
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -89,3 +76,62 @@ jobs:
         with:
           path: outputs/kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
           name: kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+
+  image:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Extract tag name
+        id: vars
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: Docker hub login
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: .
+          push: true
+          tags: |
+            chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
+            ghcr.io/chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: image
+    steps:
+      - name: Extract tag name
+        id: vars
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          name: Release ${{ steps.vars.outputs.tag }}
+          tag: ${{ steps.vars.outputs.tag }}
+          body: |
+            auto generated, will be replaced pretty soon with good stuff
+
+            DockerHub: chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
+            GHCR: ghcr.io/chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
+          files: |
+            kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}

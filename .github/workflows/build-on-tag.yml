@@ -11,6 +11,8 @@ env:
   GOARCH: amd64
   # net/http might need disabling CGO
   CGO_ENABLED: 0
+  BINARY_NAME: kibana_exporter
+  IMAGE_NAME: kibana-prometheus-exporter
 
 jobs:
   lint:
@@ -69,13 +71,13 @@ jobs:
           TAG_NAME: ${{ steps.vars.outputs.tag }}
         run: |
           mkdir -p outputs/
-          go build -ldflags "-extldflags '-static' -s -w" -a -o outputs/kibana_exporter-${TAG_NAME}-${GOOS}-${GOARCH}
+          go build -ldflags "-extldflags '-static' -s -w" -a -o outputs/${{ env.BINARY_NAME }}-${TAG_NAME}-${GOOS}-${GOARCH}
 
       - name: Upload build artefact
         uses: actions/upload-artifact@v3
         with:
-          path: outputs/kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
-          name: kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+          path: outputs/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+          name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
 
   image:
     runs-on: ubuntu-latest
@@ -103,21 +105,19 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v3
         with:
-          name: kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
-          path: build/release/kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+          name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+          path: build/release/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
           build-args: |
-            VERSION=${{ steps.vars.outputs.tag }}
-            OS=${{ env.GOOS }}
-            ARCH=${{ env.GOARCH }}
+            BINARY=${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
           push: true
           tags: |
-            chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
-            ghcr.io/chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
+            chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
 
   release:
     runs-on: ubuntu-latest
@@ -132,7 +132,7 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v3
         with:
-          name: kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+          name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
 
       - name: Create release
         uses: softprops/action-gh-release@v1
@@ -142,7 +142,7 @@ jobs:
           body: |
             auto generated, will be replaced pretty soon with good stuff
 
-            DockerHub: chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
-            GHCR: ghcr.io/chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
+            DockerHub: `docker pull chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
+            GHCR: `docker pull ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
           files: |
-            kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+            ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}

@@ -1,8 +1,9 @@
 # Makefile
+# Deprecated: GH Workflow encouraged
 BINARY="kibana_exporter"
 IMG="kibana-prometheus-exporter"
 TARGET="build"
-VERSION="v8.5.x.1-latest"
+VERSION="latest"
 
 # explicitly go mod
 export GO111MODULE=on

@@ -69,13 +69,13 @@ jobs:
           TAG_NAME: ${{ steps.vars.outputs.tag }}
         run: |
           mkdir -p outputs/
-          go build -ldflags "-extldflags '-static' -s -w" -a -o outputs/kibana_exporter_${TAG_NAME}_${GOOS}_${GOARCH}
+          go build -ldflags "-extldflags '-static' -s -w" -a -o outputs/kibana_exporter-${TAG_NAME}-${GOOS}-${GOARCH}
 
       - name: Upload build artefact
         uses: actions/upload-artifact@v3
         with:
-          path: outputs/kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
-          name: kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+          path: outputs/kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+          name: kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
 
   image:
     runs-on: ubuntu-latest
@@ -103,8 +103,8 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v3
         with:
-          name: kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
-          path: build/release/kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+          name: kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+          path: build/release/kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
@@ -130,7 +130,8 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v3
         with:
-          name: kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+          name: kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+          path: build/release/kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
 
       - name: Create release
         uses: softprops/action-gh-release@v1
@@ -144,4 +145,4 @@ jobs:
             DockerHub: chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
             GHCR: ghcr.io/chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
           files: |
-            kibana_exporter_${{ steps.vars.outputs.tag }}_${{ env.GOOS }}_${{ env.GOARCH }}
+            build/release/kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}

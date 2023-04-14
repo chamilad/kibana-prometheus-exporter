@@ -146,4 +146,4 @@ jobs:
             DockerHub: chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
             GHCR: ghcr.io/chamilad/kibana-prometheus-exporter:${{ steps.vars.outputs.tag }}
           files: |
-            kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+            ./kibana_exporter-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}

@@ -125,17 +125,19 @@ jobs:
           tar zxvf spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
           ./spdx-sbom-generator --include-license-text --format spdx
           ./spdx-sbom-generator --include-license-text --format json
+          mv bom-go-mod.spdx sbom-${TAG_NAME}.spdx
+          mv bom-go-mod.json sbom-${TAG_NAME}.json
 
       - name: Upload sbom spdx artefact
         uses: actions/upload-artifact@v3
         with:
-          path: bom-go-mod.spdx
+          path: sbom-${{ steps.vars.outputs.tag }}.spdx
           name: sbom-${{ steps.vars.outputs.tag }}.spdx
 
       - name: Upload sbom json artefact
         uses: actions/upload-artifact@v3
         with:
-          path: bom-go-mod.json
+          path: sbom-${{ steps.vars.outputs.tag }}.json
           name: sbom-${{ steps.vars.outputs.tag }}.json
 
   build-image-and-sign:
@@ -246,13 +248,12 @@ jobs:
           TAG_NAME: ${{ steps.vars.outputs.tag }}
         run: |
           echo "${COSIGN_PUB}" > cosign-${TAG_NAME}.pub
-          ls -alh
-          tree
 
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
           draft: true
+          fail_on_unmatched_files: true
           name: Release ${{ steps.vars.outputs.tag }}
           body: |
             \<auto generated, will be replaced pretty soon with good stuff\>

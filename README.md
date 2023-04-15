@@ -169,13 +169,37 @@ The metrics exposed by this Exporter are the following.
 | `kibana_requests_disconnects`   | Kibana request disconnections count          | Gauge |
 | `kibana_requests_total`         | Kibana total request count                   | Gauge |
 
+## Binary and Image Verification
+
+The binary and the Docker images are signed with [Sigstore Cosign](https://docs.sigstore.dev/main-concepts/). The public key
+is available in the release artefacts as `cosign-<release_tag>.pub`.
+
+[Install `cosign`](https://docs.sigstore.dev/cosign/installation/) and use the following commands on Linux to verify the binaries and the images.
+
+> Replace `<release_tag>`, `<binary>`, and `<image>` values as necessary. Each
+> release note will have release specific commands.
+
+```bash
+# download the binary, signature, and the public key
+wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/<release_tag>/<binary>
+wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/<release_tag>/<binary>.sig
+wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/<release_tag>/cosign-<release_tag>.pub
+
+# verify the images and the binary
+cosign verify --key cosign-<release_tag>.pub chamilad/<image>:<release_tag>
+cosign verify --key cosign-<release_tag>.pub ghcr.io/chamilad/<image>:<release_tag>
+cosign verify-blob --key cosign-<release_tag>.pub --signature <binary>.sig <binary>
+```
+
+Additionally, a Software Bill of Materials (SBOM), in both SPDX and JSON formats are
+attached to the artefacts in each release.
+
 ## TODO
 
 1. Test other versions and edge cases more
 2. Come up with a way to keep up with Kibana API changes
 3. Add more metrics related to the scrape job itself
 4. Add a Grafana dashboards with (Prometheus) alerts
-5. Add mTLS to the metrics server
 
 ## Contributing
 

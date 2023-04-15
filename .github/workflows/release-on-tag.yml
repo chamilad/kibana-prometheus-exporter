@@ -123,20 +123,19 @@ jobs:
         run: |
           wget https://github.com/opensbom-generator/spdx-sbom-generator/releases/download/v0.0.15/spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
           tar zxvf spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
-          mkdir outputs
-          ./spdx-sbom-generator -i -f spdx -o outputs/sbom-${TAG_NAME}.spdx
-          ./spdx-sbom-generator -i -f json -o outputs/sbom-${TAG_NAME}.json
+          ./spdx-sbom-generator --include-license-text --format spdx
+          ./spdx-sbom-generator --include-license-text --format json
 
       - name: Upload sbom spdx artefact
         uses: actions/upload-artifact@v3
         with:
-          path: outputs/sbom-${{ steps.vars.outputs.tag }}.spdx
+          path: bom-go-mod.spdx
           name: sbom-${{ steps.vars.outputs.tag }}.spdx
 
       - name: Upload sbom json artefact
         uses: actions/upload-artifact@v3
         with:
-          path: outputs/sbom-${{ steps.vars.outputs.tag }}.json
+          path: bom-go-mod.json
           name: sbom-${{ steps.vars.outputs.tag }}.json
 
   build-image-and-sign:

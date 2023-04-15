@@ -26,7 +26,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: lint
     permissions:
       contents: read
 
@@ -44,9 +43,11 @@ jobs:
       - name: Test
         run: go test -v ./...
 
-  build:
+  build-and-sign:
     runs-on: ubuntu-latest
-    needs: test
+    needs:
+      - test
+      - lint
     permissions:
       contents: read
       id-token: write
@@ -103,9 +104,46 @@ jobs:
           path: outputs/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
           name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
 
+  dilligence:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Extract tag name
+        id: vars
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: Generate SBOM
+        env:
+          TAG_NAME: ${{ steps.vars.outputs.tag }}
+        run: |
+          wget https://github.com/opensbom-generator/spdx-sbom-generator/releases/download/v0.0.15/spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
+          tar zxvf spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
+          mkdir outputs
+          ./spdx-sbom-generator -i -f spdx -o outputs/sbom-${TAG_NAME}.spdx
+          ./spdx-sbom-generator -i -f json -o outputs/sbom-${TAG_NAME}.json
+
+      - name: Upload sbom spdx artefact
+        uses: actions/upload-artifact@v3
+        with:
+          path: outputs/sbom-${{ steps.vars.outputs.tag }}.spdx
+          name: sbom-${{ steps.vars.outputs.tag }}.spdx
+
+      - name: Upload sbom json artefact
+        uses: actions/upload-artifact@v3
+        with:
+          path: outputs/sbom-${{ steps.vars.outputs.tag }}.json
+          name: sbom-${{ steps.vars.outputs.tag }}.json
+
   build-image-and-sign:
     runs-on: ubuntu-latest
-    needs: build
+    needs:
+      - build-and-sign
+      - dilligence
     permissions:
       contents: read
       packages: write
@@ -167,45 +205,11 @@ jobs:
           cosign sign --key cosign.key --yes chamilad/${IMAGE_NAME}:${TAG_NAME}
           cosign sign --key cosign.key --yes ghcr.io/chamilad/${IMAGE_NAME}:${TAG_NAME}
 
-  dilligence:
-    runs-on: ubuntu-latest
-    needs: test
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Extract tag name
-        id: vars
-        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
-
-      - name: Generate SBOM
-        env:
-          TAG_NAME: ${{ steps.vars.outputs.tag }}
-        run: |
-          wget https://github.com/opensbom-generator/spdx-sbom-generator/releases/download/v0.0.15/spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
-          tar zxvf spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
-          ./spdx-sbom-generator -i -f spdx -o sbom-${TAG_NAME}.spdx
-          ./spdx-sbom-generator -i -f json -o sbom-${TAG_NAME}.json
-
-      - name: Upload sbom spdx artefact
-        uses: actions/upload-artifact@v3
-        with:
-          path: sbom-${{ steps.vars.outputs.tag }}.spdx
-          name: sbom-${{ steps.vars.outputs.tag }}.spdx
-
-      - name: Upload sbom json artefact
-        uses: actions/upload-artifact@v3
-        with:
-          path: sbom-${{ steps.vars.outputs.tag }}.json
-          name: sbom-${{ steps.vars.outputs.tag }}.json
-
   release:
     runs-on: ubuntu-latest
     needs:
       - dilligence
-      - build
+      - build-and-sign
     permissions:
       contents: write
       actions: read

@@ -191,11 +191,6 @@ jobs:
         with:
           name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
 
-      - name: Download cert artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.pem
-
       - name: Get cosign pub key
         env:
           COSIGN_PUB: ${{ secrets.COSIGN_PUB }}
@@ -208,11 +203,32 @@ jobs:
           draft: true
           name: Release ${{ steps.vars.outputs.tag }}
           body: |
+            # Release ${{ steps.vars.outputs.tag }}
             \<auto generated, will be replaced pretty soon with good stuff\>
 
-            DockerHub: `docker pull chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
-            GHCR: `docker pull ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
+            ## Docker Images
+            Docker images are available in the following registries.
+            1. DockerHub: `docker pull chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
+            1. GHCR: `docker pull ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
 
+            ## Verification
+            The binary and the Docker images are signed with (Sigstore Cosign)[https://docs.sigstore.dev/main-concepts/]. The public key
+            is available in the release artefacts as `cosign.pub`.
+
+            (Install `cosign`)[https://docs.sigstore.dev/cosign/installation/] and use the following commands on Linux to verify the binaries and the images.
+            ```bash
+            # download the binary, signature, and the public key
+            wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/${{ steps.vars.outputs.tag }}/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+            wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/${{ steps.vars.outputs.tag }}/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
+            wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/${{ steps.vars.outputs.tag }}/cosign.pub
+
+            # verify the images and the binary
+            cosign verify --key cosign.pub chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            cosign verify --key cosign.pub ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            cosign verify-blob --key cosign.pub ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+            ```
+
+            ## Usage
             Please refer to the [README.md ](README.md) for the usage details.
           files: |
             ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}

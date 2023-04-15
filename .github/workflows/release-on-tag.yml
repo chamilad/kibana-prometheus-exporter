@@ -246,6 +246,8 @@ jobs:
           TAG_NAME: ${{ steps.vars.outputs.tag }}
         run: |
           echo "${COSIGN_PUB}" > cosign-${TAG_NAME}.pub
+          ls -alh
+          tree
 
       - name: Create release
         uses: softprops/action-gh-release@v1

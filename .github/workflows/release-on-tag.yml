@@ -1,6 +1,6 @@
 ---
-name: build-on-tag-creation
-run-name: Running build on ${{ github.ref_name }} ${{ github.ref_type }}
+name: release-on-tag-creation
+run-name: Creating a release on ${{ github.ref_name }} ${{ github.ref_type }}
 on:
   push:
     tags:
@@ -44,7 +44,7 @@ jobs:
       - name: Test
         run: go test -v ./...
 
-  build-and-sign:
+  build:
     runs-on: ubuntu-latest
     needs: test
     permissions:
@@ -105,7 +105,7 @@ jobs:
 
   build-image-and-sign:
     runs-on: ubuntu-latest
-    needs: build-and-sign
+    needs: build
     permissions:
       contents: read
       packages: write
@@ -167,9 +167,45 @@ jobs:
           cosign sign --key cosign.key --yes chamilad/${IMAGE_NAME}:${TAG_NAME}
           cosign sign --key cosign.key --yes ghcr.io/chamilad/${IMAGE_NAME}:${TAG_NAME}
 
+  dilligence:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Extract tag name
+        id: vars
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: Generate SBOM
+        env:
+          TAG_NAME: ${{ steps.vars.outputs.tag }}
+        run: |
+          wget https://github.com/opensbom-generator/spdx-sbom-generator/releases/download/v0.0.15/spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
+          tar zxvf spdx-sbom-generator-v0.0.15-linux-amd64.tar.gz
+          ./spdx-sbom-generator -i -f spdx -o sbom-${TAG_NAME}.spdx
+          ./spdx-sbom-generator -i -f json -o sbom-${TAG_NAME}.json
+
+      - name: Upload sbom spdx artefact
+        uses: actions/upload-artifact@v3
+        with:
+          path: sbom-${{ steps.vars.outputs.tag }}.spdx
+          name: sbom-${{ steps.vars.outputs.tag }}.spdx
+
+      - name: Upload sbom json artefact
+        uses: actions/upload-artifact@v3
+        with:
+          path: sbom-${{ steps.vars.outputs.tag }}.json
+          name: sbom-${{ steps.vars.outputs.tag }}.json
+
   release:
     runs-on: ubuntu-latest
-    needs: build-and-sign
+    needs:
+      - dilligence
+      - build
     permissions:
       contents: write
       actions: read
@@ -191,11 +227,22 @@ jobs:
         with:
           name: ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
 
+      - name: Download sbom spdx artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sbom-${{ steps.vars.outputs.tag }}.spdx
+
+      - name: Download sbom json artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sbom-${{ steps.vars.outputs.tag }}.json
+
       - name: Get cosign pub key
         env:
           COSIGN_PUB: ${{ secrets.COSIGN_PUB }}
+          TAG_NAME: ${{ steps.vars.outputs.tag }}
         run: |
-          echo "${COSIGN_PUB}" > cosign.pub
+          echo "${COSIGN_PUB}" > cosign-${TAG_NAME}.pub
 
       - name: Create release
         uses: softprops/action-gh-release@v1
@@ -203,34 +250,42 @@ jobs:
           draft: true
           name: Release ${{ steps.vars.outputs.tag }}
           body: |
-            # Release ${{ steps.vars.outputs.tag }}
             \<auto generated, will be replaced pretty soon with good stuff\>
 
             ## Docker Images
             Docker images are available in the following registries.
-            1. DockerHub: `docker pull chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
-            1. GHCR: `docker pull ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}`
+
+            ```bash
+            # docker hub
+            docker pull chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+
+            # github container registry
+            docker pull ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            ```
 
             ## Verification
-            The binary and the Docker images are signed with (Sigstore Cosign)[https://docs.sigstore.dev/main-concepts/]. The public key
-            is available in the release artefacts as `cosign.pub`.
+            The binary and the Docker images are signed with [Sigstore Cosign](https://docs.sigstore.dev/main-concepts/). The public key
+            is available in the release artefacts as `cosign-${{ steps.vars.outputs.tag }}.pub`.
 
-            (Install `cosign`)[https://docs.sigstore.dev/cosign/installation/] and use the following commands on Linux to verify the binaries and the images.
+            [Install `cosign`](https://docs.sigstore.dev/cosign/installation/) and use the following commands on Linux to verify the binaries and the images.
+
             ```bash
             # download the binary, signature, and the public key
             wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/${{ steps.vars.outputs.tag }}/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
             wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/${{ steps.vars.outputs.tag }}/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
-            wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/${{ steps.vars.outputs.tag }}/cosign.pub
+            wget https://github.com/chamilad/kibana-prometheus-exporter/releases/download/${{ steps.vars.outputs.tag }}/cosign-${{ steps.vars.outputs.tag }}.pub
 
             # verify the images and the binary
-            cosign verify --key cosign.pub chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
-            cosign verify --key cosign.pub ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
-            cosign verify-blob --key cosign.pub ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+            cosign verify --key cosign-${{ steps.vars.outputs.tag }}.pub chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            cosign verify --key cosign-${{ steps.vars.outputs.tag }}.pub ghcr.io/chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            cosign verify-blob --key cosign-${{ steps.vars.outputs.tag }}.pub --signature ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
             ```
 
             ## Usage
-            Please refer to the [README.md ](README.md) for the usage details.
+            Refer to the [README.md ](README.md) for the usage details.
           files: |
             ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
             ${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}.sig
-            cosign.pub
+            cosign-${{ steps.vars.outputs.tag }}.pub
+            sbom-${{ steps.vars.outputs.tag }}.json
+            sbom-${{ steps.vars.outputs.tag }}.spdx

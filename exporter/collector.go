@@ -31,33 +31,60 @@ type KibanaCollector struct {
 
 // KibanaMetrics is used to unmarshal the metrics response from Kibana.
 type KibanaMetrics struct {
+	Name string `json:"name"`
+
+	Version struct {
+		Number string `json:"number"`
+	} `json:"version"`
+
 	Status struct {
 		Overall struct {
-			State string `json:"state"`
+			Level string `json:"level"`
 		} `json:"overall"`
+
+		Core struct {
+			Elasticsearch struct {
+				Level string `json:"level"`
+			} `json:"elasticsearch"`
+			SavedObjects struct {
+				Level string `json:"level"`
+			} `json:"savedObjects"`
+		} `json:"core"`
 	} `json:"status"`
+
 	Metrics struct {
 		ConcurrentConnections int `json:"concurrent_connections"`
-		Process               struct {
+
+		Process struct {
 			UptimeInMillis float64 `json:"uptime_in_millis"`
 			Memory         struct {
 				Heap struct {
 					TotalInBytes int64 `json:"total_in_bytes"`
 					UsedInBytes  int64 `json:"used_in_bytes"`
 				} `json:"heap"`
+				ResidentSetSizeInBytes int64 `json:"resident_set_size_in_bytes"`
 			} `json:"memory"`
+			// https://github.com/elastic/kibana/blob/9517d067b5d7bb57d89bd62a1f786fda308da26b/packages/core/metrics/core-metrics-server-internal/src/logging/get_ops_metrics_log.ts#L33
+			EventLoopDelayInMillis float64 `json:"event_loop_delay"`
 		} `json:"process"`
+
 		Os struct {
+			Memory struct {
+				TotalInBytes int64 `json:"total_in_bytes"`
+				UsedInBytes  int64 `json:"used_in_bytes"`
+			} `json:"memory"`
 			Load struct {
 				Load1m  float64 `json:"1m"`
 				Load5m  float64 `json:"5m"`
 				Load15m float64 `json:"15m"`
 			} `json:"load"`
 		} `json:"os"`
+
 		ResponseTimes struct {
 			AvgInMillis float64 `json:"avg_in_millis"`
 			MaxInMillis float64 `json:"max_in_millis"`
 		} `json:"response_times"`
+
 		Requests struct {
 			Disconnects int `json:"disconnects"`
 			Total       int `json:"total"`
@@ -70,12 +97,15 @@ func (c *KibanaCollector) TestConnection() bool {
 	log.Debug().
 		Msg("checking for kibana status")
 
-	_, err := c.scrape()
+	m, err := c.scrape()
 	if err != nil {
 		log.Info().
 			Msgf("test connection to kibana failed: %s", err)
 		return false
 	}
+
+	log.Info().
+		Msgf("connected to Kibana node %s with version %s and status %s", m.Name, m.Version.Number, m.Status.Overall.Level)
 
 	return true
 }

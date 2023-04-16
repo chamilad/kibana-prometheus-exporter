@@ -13,7 +13,8 @@ A standalone Prometheus exporter for Kibana metrics inspired by the [Kibana Prom
 
 This makes use of the `/api/status` endpoint to gather and convert metrics to the Prometheus OpenMetrics format.
 
-![](metrics-output.png)
+![](img/metrics-output.png)
+![](img/dashboard.png)
 
 ## Usage
 

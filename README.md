@@ -154,20 +154,31 @@ $ helm install <release-name> afcharts/kibana-exporter
 
 The metrics exposed by this Exporter are the following.
 
-| Metric                          | Description                                  | Type  |
-| ------------------------------- | -------------------------------------------- | ----- |
-| `kibana_status`                 | Kibana overall status                        | Gauge |
-| `kibana_concurrent_connections` | Kibana Concurrent Connections                | Gauge |
-| `kibana_millis_uptime`          | Kibana uptime in milliseconds                | Gauge |
-| `kibana_heap_max_in_bytes`      | Kibana Heap maximum in bytes                 | Gauge |
-| `kibana_heap_used_in_bytes`     | Kibana Heap usage in bytes                   | Gauge |
-| `kibana_os_load_1m`             | Kibana load average 1m                       | Gauge |
-| `kibana_os_load_5m`             | Kibana load average 5m                       | Gauge |
-| `kibana_os_load_15m`            | Kibana load average 15m                      | Gauge |
-| `kibana_response_average`       | Kibana average response time in milliseconds | Gauge |
-| `kibana_response_max`           | Kibana maximum response time in milliseconds | Gauge |
-| `kibana_requests_disconnects`   | Kibana request disconnections count          | Gauge |
-| `kibana_requests_total`         | Kibana total request count                   | Gauge |
+| Metric                              | Description                                     | Type  |
+| ----------------------------------- | ----------------------------------------------- | ----- |
+| `kibana_status`                     | Kibana overall status                           | Gauge |
+| `kibana_core_es_status`             | Kibana Elasticsearch status                     | Gauge |
+| `kibana_core_savedobjects_status`   | Kibana SavedObjects service status              | Gauge |
+| `kibana_concurrent_connections`     | Kibana Concurrent Connections                   | Gauge |
+| `kibana_millis_uptime`              | Kibana uptime in milliseconds                   | Gauge |
+| `kibana_heap_max_in_bytes`          | Kibana Heap maximum in bytes                    | Gauge |
+| `kibana_heap_used_in_bytes`         | Kibana Heap usage in bytes                      | Gauge |
+| `kibana_resident_set_size_in_bytes` | Kibana Resident Set Size in bytes               | Gauge |
+| `kibana_os_load_1m`                 | Kibana load average 1m                          | Gauge |
+| `kibana_os_load_5m`                 | Kibana load average 5m                          | Gauge |
+| `kibana_os_load_15m`                | Kibana load average 15m                         | Gauge |
+| `kibana_os_memory_max_in_bytes`     | Kibana OS memory total                          | Gauge |
+| `kibana_os_memory_used_in_bytes`    | Kibana OS memory used                           | Gauge |
+| `kibana_event_loop_delay`           | Kibana NodeJS Event Loop Delay in Milli Seconds | Gauge |
+| `kibana_response_average`           | Kibana average response time in milliseconds    | Gauge |
+| `kibana_response_max`               | Kibana maximum response time in milliseconds    | Gauge |
+| `kibana_requests_disconnects`       | Kibana request disconnections count             | Gauge |
+| `kibana_requests_total`             | Kibana total request count                      | Gauge |
+
+## Grafana Dashboard
+
+A simple starter dashboard `json` file is included in the repository for
+Grafana. This can be used as a starting place to customise for own needs.
 
 ## Binary and Image Verification
 

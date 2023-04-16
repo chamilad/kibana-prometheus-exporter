@@ -9,6 +9,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	// https://github.com/elastic/kibana/blob/12466d8b17d8557ff0b561c346511bd1760da4c1/packages/core/status/core-status-common/src/service_status.ts
+	statusLevels = map[string]float64{
+		// everything is working
+		"available": 1,
+		// some features may not be working
+		"degraded": 0.5,
+		// the service is unavailble, but other functions that do not depend on this service should work.
+		"unavailable": 0.25,
+		// block all user functions and display the status page, reserved for Core services only.
+		"critical": 0,
+	}
+)
+
 // Exporter implements the prometheus.Collector interface. This will
 // be used to register the metrics with Prometheus.
 type Exporter struct {
@@ -17,13 +31,19 @@ type Exporter struct {
 
 	// metrics
 	status                prometheus.Gauge
+	coreESStatus          prometheus.Gauge
+	coreSOStatus          prometheus.Gauge
 	concurrentConnections prometheus.Gauge
 	uptime                prometheus.Gauge
 	heapTotal             prometheus.Gauge
 	heapUsed              prometheus.Gauge
+	resSetSize            prometheus.Gauge
+	eventLoopDelay        prometheus.Gauge
 	load1m                prometheus.Gauge
 	load5m                prometheus.Gauge
 	load15m               prometheus.Gauge
+	osMemTotal            prometheus.Gauge
+	osMemUsed             prometheus.Gauge
 	respTimeAvg           prometheus.Gauge
 	respTimeMax           prometheus.Gauge
 	reqDisconnects        prometheus.Gauge
@@ -48,6 +68,18 @@ func NewExporter(namespace string, collector *KibanaCollector) (*Exporter, error
 				Help:      "Kibana overall status",
 				Namespace: namespace,
 			}),
+		coreESStatus: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "core_es_status",
+				Help:      "Kibana Elasticsearch connectivity status",
+				Namespace: namespace,
+			}),
+		coreSOStatus: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "core_savedobjects_status",
+				Help:      "Kibana SavedObjects service status",
+				Namespace: namespace,
+			}),
 		concurrentConnections: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name:      "concurrent_connections",
@@ -64,13 +96,25 @@ func NewExporter(namespace string, collector *KibanaCollector) (*Exporter, error
 			prometheus.GaugeOpts{
 				Name:      "heap_max_in_bytes",
 				Namespace: namespace,
-				Help:      "Kibana Heap maximum in bytes",
+				Help:      "Kibana process Heap maximum in bytes",
 			}),
 		heapUsed: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name:      "heap_used_in_bytes",
 				Namespace: namespace,
-				Help:      "Kibana Heap usage in bytes",
+				Help:      "Kibana process Heap usage in bytes",
+			}),
+		resSetSize: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "resident_set_size_in_bytes",
+				Namespace: namespace,
+				Help:      "Kibana Memory Resident Set Size in bytes",
+			}),
+		eventLoopDelay: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "event_loop_delay",
+				Namespace: namespace,
+				Help:      "Kibana NodeJS Event Loop Delay in milliseconds",
 			}),
 		load1m: prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -89,6 +133,18 @@ func NewExporter(namespace string, collector *KibanaCollector) (*Exporter, error
 				Name:      "os_load_15m",
 				Namespace: namespace,
 				Help:      "Kibana load average 15m",
+			}),
+		osMemTotal: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "os_memory_max_in_bytes",
+				Namespace: namespace,
+				Help:      "Kibana memory maximum in bytes",
+			}),
+		osMemUsed: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name:      "os_memory_used_in_bytes",
+				Namespace: namespace,
+				Help:      "Kibana memory used in bytes",
 			}),
 		respTimeAvg: prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -125,21 +181,41 @@ func (e *Exporter) parseMetrics(m *KibanaMetrics) error {
 	log.Trace().
 		Msg("parsing received metrics from kibana")
 
-	// any value other than "green" is assumed to be less than 1
-	statusVal := 0.0
-	if strings.ToLower(m.Status.Overall.State) == "green" {
-		statusVal = 1.0
+	if val, ok := statusLevels[strings.ToLower(m.Status.Overall.Level)]; !ok {
+		// absence of this metric will default to critical
+		// initialising is also considered 0
+		e.status.Set(0.0)
+	} else {
+		e.status.Set(val)
 	}
 
-	e.status.Set(statusVal)
+	if val, ok := statusLevels[strings.ToLower(m.Status.Core.Elasticsearch.Level)]; !ok {
+		// absence of this metric will default to critical
+		// initialising is also considered 0
+		e.coreESStatus.Set(0.0)
+	} else {
+		e.coreESStatus.Set(val)
+	}
+
+	if val, ok := statusLevels[strings.ToLower(m.Status.Core.SavedObjects.Level)]; !ok {
+		// absence of this metric will default to critical
+		// initialising is also considered 0
+		e.coreSOStatus.Set(0.0)
+	} else {
+		e.coreSOStatus.Set(val)
+	}
 
 	e.concurrentConnections.Set(float64(m.Metrics.ConcurrentConnections))
 	e.uptime.Set(float64(m.Metrics.Process.UptimeInMillis))
 	e.heapTotal.Set(float64(m.Metrics.Process.Memory.Heap.TotalInBytes))
 	e.heapUsed.Set(float64(m.Metrics.Process.Memory.Heap.UsedInBytes))
+	e.resSetSize.Set(float64(m.Metrics.Process.Memory.ResidentSetSizeInBytes))
+	e.eventLoopDelay.Set(m.Metrics.Process.EventLoopDelayInMillis)
 	e.load1m.Set(m.Metrics.Os.Load.Load1m)
 	e.load5m.Set(m.Metrics.Os.Load.Load5m)
 	e.load15m.Set(m.Metrics.Os.Load.Load15m)
+	e.osMemTotal.Set(float64(m.Metrics.Os.Memory.TotalInBytes))
+	e.osMemUsed.Set(float64(m.Metrics.Os.Memory.UsedInBytes))
 	e.respTimeAvg.Set(m.Metrics.ResponseTimes.AvgInMillis)
 	e.respTimeMax.Set(m.Metrics.ResponseTimes.MaxInMillis)
 	e.reqDisconnects.Set(float64(m.Metrics.Requests.Disconnects))
@@ -150,13 +226,19 @@ func (e *Exporter) parseMetrics(m *KibanaMetrics) error {
 
 func (e *Exporter) send(ch chan<- prometheus.Metric) error {
 	ch <- e.status
+	ch <- e.coreESStatus
+	ch <- e.coreSOStatus
 	ch <- e.concurrentConnections
 	ch <- e.uptime
 	ch <- e.heapTotal
 	ch <- e.heapUsed
+	ch <- e.resSetSize
+	ch <- e.eventLoopDelay
 	ch <- e.load1m
 	ch <- e.load5m
 	ch <- e.load15m
+	ch <- e.osMemTotal
+	ch <- e.osMemUsed
 	ch <- e.respTimeAvg
 	ch <- e.respTimeMax
 	ch <- e.reqDisconnects
@@ -168,13 +250,19 @@ func (e *Exporter) send(ch chan<- prometheus.Metric) error {
 // Describe is the Exporter implementing prometheus.Collector
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.status.Desc()
+	ch <- e.coreESStatus.Desc()
+	ch <- e.coreSOStatus.Desc()
 	ch <- e.concurrentConnections.Desc()
 	ch <- e.uptime.Desc()
 	ch <- e.heapTotal.Desc()
 	ch <- e.heapUsed.Desc()
+	ch <- e.resSetSize.Desc()
+	ch <- e.eventLoopDelay.Desc()
 	ch <- e.load1m.Desc()
 	ch <- e.load5m.Desc()
 	ch <- e.load15m.Desc()
+	ch <- e.osMemTotal.Desc()
+	ch <- e.osMemUsed.Desc()
 	ch <- e.respTimeAvg.Desc()
 	ch <- e.respTimeMax.Desc()
 	ch <- e.reqDisconnects.Desc()

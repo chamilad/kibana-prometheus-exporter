@@ -18,18 +18,21 @@ This makes use of the `/api/status` endpoint to gather and convert metrics to th
 
 ## Usage
 
-> **NOTE**: Currently tested against below Kibana versions only.
+> **NOTE**: Currently tested against below Kibana versions only. Checkout
+> releases and Docker images for support for other Kibana versions.
 >
-> 1. 7.5
-> 1. 7.8
-> 1. 7.10
 > 1. 8.5
+> 1. 8.7
 >
 > Please open an issue if you see errors or missing metrics with the Kibana version you're using.
 >
 > Match the Kibana version with the release tag (ex: release `v7.5.x.2` will work with Kibana `7.5.x` versions. It's possible it will continue to work for a few more minor releases, but this depends on what Elastic decides to do with the idea of semantic versioning)
 >
 > First 3 sections of the release tag represents the Kibana version compatibility, while the last section indicates patching increments.
+> Older releases will work with the corresponding Kibana versions, however some
+> newer features such as the `/healthz` endpoint will not be backported to
+> them, at least initially. Please open an issue if you are working with an older Kibana version
+> but still needs them updated.
 
 ```bash
 # expose metrics from the local Kibana instance using the provided username and password

@@ -181,7 +181,7 @@ jobs:
         with:
           context: .
           build-args: |
-            BINARY=${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
+            BINARY=${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}/${{ env.BINARY_NAME }}-${{ steps.vars.outputs.tag }}-${{ env.GOOS }}-${{ env.GOARCH }}
           push: true
           tags: |
             chamilad/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
